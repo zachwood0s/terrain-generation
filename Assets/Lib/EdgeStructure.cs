@@ -5,7 +5,7 @@ using UnityEngine;
 
 public class Vertex
 {
-    public Vector3 position;
+    public Vector3 v;
     public HalfEdge halfEdge;
     public Triangle triangle;
     public Vertex prevVertex;
@@ -17,12 +17,12 @@ public class Vertex
 
     public Vertex(Vector3 pos)
     {
-        position = pos;
+        v = pos;
     }
 
     public Vector2 Get2D()
     {
-        return new Vector2(position.x, position.z);
+        return new Vector2(v.x, v.z);
     }
 }
 
@@ -41,7 +41,7 @@ public class Edge
 
     public Vector2 Get2d(Vertex v)
     {
-        return new Vector2(v.position.x, v.position.z);
+        return new Vector2(v.v.x, v.v.z);
     }
 
     public void FlipDirection()
@@ -59,7 +59,7 @@ public class HalfEdge
     public HalfEdge nextEdge;
     public HalfEdge prevEdge;
 
-    public HalfEdge oppositeEdge;
+    public HalfEdge twin;
 
     public HalfEdge(Vertex _v) 
     {
@@ -98,6 +98,58 @@ public class Triangle
     {
         // Swap the vertices
         (v1, v2) = (v2, v1);
+    }
+
+    public IEnumerable<HalfEdge> CollectHalfEdges()
+    {
+        HalfEdge h1 = new HalfEdge(v1);
+        HalfEdge h2 = new HalfEdge(v2);
+        HalfEdge h3 = new HalfEdge(v3);
+
+        h1.nextEdge = h2;
+        h2.nextEdge = h3;
+        h3.nextEdge = h1;
+
+        h1.nextEdge = h3;
+        h2.nextEdge = h1;
+        h3.nextEdge = h2;
+
+        h1.v.halfEdge = h2;
+        h2.v.halfEdge = h3;
+        h3.v.halfEdge = h1;
+
+        halfEdge = h1;
+
+        h1.t = this;
+        h2.t = this;
+        h3.t = this;
+
+        yield return h1;
+        yield return h2;
+        yield return h3;
+    }
+
+    public void MakeClockwise()
+    {
+        if (!IsClockwise())
+        {
+            FlipDirection();
+        }
+    }
+
+    public bool IsClockwise()
+    {
+        bool isClockwise = true;
+
+        float determinant = v1.v.x * v2.v.y + v3.v.x * v1.v.y + v2.v.x * v3.v.y - 
+                            v1.v.x * v3.v.y - v3.v.x * v2.v.y - v2.v.x * v1.v.y;
+
+        if (determinant > 0f)
+        {
+            isClockwise = false;
+        }
+
+        return isClockwise;
     }
 }
 

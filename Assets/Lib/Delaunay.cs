@@ -6,11 +6,16 @@ using UnityEngine.Assertions;
 public class Delaunay 
 {
 
+    public static Triangle SuperTriangle() => 
+        new Triangle(new Vector3(-100f, 0, -100f), new Vector3(100f, 0, -100f), new Vector3(0, 0, 100f));
+
     public static void Generate(HashSet<Vector3> points)
     {
         Assert.IsTrue(points.Count >= 2, "Must have more than 1 point");
 
         // Step 1: Create super triangle and point location graph
+
+        var super = SuperTriangle();
 
         // Step 2: Insert each point into the graph
 
