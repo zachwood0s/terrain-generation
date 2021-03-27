@@ -15,14 +15,14 @@ public static class GeometryHelpers
 
         foreach(var (i, edge) in halfEdges.WithIndex())
         {
-            var endV = edge.v;
-            var startV = edge.prevEdge.v;
+            var endV = edge.tail;
+            var startV = edge.prevEdge.tail;
 
             foreach(var (j, edge2) in halfEdges.WithIndex())
             {
                 if (i == j) continue;
 
-                if (startV.v == edge2.v.v && endV.v == edge2.prevEdge.v.v)
+                if (startV.v == edge2.tail.v && endV.v == edge2.prevEdge.tail.v)
                 {
                     edge.twin = edge2;
                     break;
@@ -59,6 +59,28 @@ public static class GeometryHelpers
 
         return determinant;
     }
+}
 
-     
+public static class FloatExt 
+{
+    public static int Sign(this float a)
+    {
+        if (Mathf.Approximately(a, 0.0f))
+            return 0;
+        if (a > 0.0)
+            return 1;
+        return -1;
+    }
+}
+
+public static class Predicates
+{
+    public static int LeftTurn(Vector2 a, Vector2 b, Vector2 c) => (c - b).Cross(a - b).Sign();
+
+    public static int XOrder(Vector2 a, Vector2 b) => (b.x - a.x).Sign();
+
+    public static int YOrder(Vector2 a, Vector2 b) => (b.y - a.y).Sign();
+
+    public static int CCW(Vector2 a, Vector2 b) => (a.Cross(b)).Sign();
+
 }

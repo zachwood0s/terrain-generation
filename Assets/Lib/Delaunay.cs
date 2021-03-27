@@ -30,4 +30,39 @@ public class Delaunay
         // Step 3: Remove super triangle
 
     }
+
+    public static void FlipEdge(HalfEdge edge)
+    {
+        var (first, second, third, _) = edge.t.CollectHalfEdges();
+        var (fourth, fifth, sixth, _) = edge.twin.t.CollectHalfEdges();
+
+        Vertex a = first.tail;
+        Vertex b = second.tail;
+        Vertex c = third.tail;
+        Vertex d = fifth.tail;
+
+        // Change the vertices
+        a.halfEdge = second;
+        c.halfEdge = fifth;
+
+        first.SetNextPrev(third, fifth);
+        second.SetNextPrev(fourth, sixth);
+        third.SetNextPrev(fifth, first);
+        fourth.SetNextPrev(sixth, second);
+        fifth.SetNextPrev(first, third);
+        sixth.SetNextPrev(second, fourth);
+
+        first.tail = b;
+        second.tail = b;
+        third.tail = c;
+        fourth.tail = d;
+        fifth.tail = d;
+        sixth.tail = a;
+
+        Triangle t1 = first.t;
+        Triangle t2 = fourth.t;
+
+        t1.ReassignEdges(first, third, fifth);
+        t2.ReassignEdges(second, fourth, fifth);
+    }
 }
