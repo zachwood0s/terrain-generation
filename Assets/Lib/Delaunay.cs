@@ -1,68 +1,297 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Assertions;
 
 public class Delaunay 
 {
+    private Graph _arr;
 
-    public static Triangle SuperTriangle() => 
-        new Triangle(new Vector3(-100f, 0, -100f), new Vector3(100f, 0, -100f), new Vector3(0, 0, 100f));
+    private Vertex super1, super2;
 
-    public static void Generate(HashSet<Vector3> points)
-    {
-        Assert.IsTrue(points.Count >= 2, "Must have more than 1 point");
+    private Triangle _graph;
 
-        // Step 1: Create super triangle and point location graph
+    public class Triangle: Face {
+        private Vertex _a, _b, _c;
 
-        var super = SuperTriangle();
+        internal Triangle[] _children;
+        private Vertex _v;
 
-        // Step 2: Insert each point into the graph
+        internal bool _flag;
 
-        // Step 2.1: Use the graph to find triangle that contains the point
+        public IReadOnlyList<Triangle> Children => _children;
+        public Vertex A => _a;
+        public Vertex B => _b;
+        public Vertex C => _c;
+        public Triangle(HalfEdge e)
+        {
+            _boundary.Add(e);
 
-        // Step 2.2: Split it into 3 (or 4) triangles
+            for (int i = 0; i < 3; ++i, e = e.Twin.Next)
+                e._face = this;
 
-        // Step 2.3: Call del which removes the illegal edges
-
-        // Step 2.4: Update the graph
-
-        // Step 3: Remove super triangle
-
+            _a = e.Tail;
+            _b = e.Head;
+            _c = e.Twin.Next.Head;
+            _children = new Triangle[3];
+            _children[0] = _children[1] = _children[2] = null;
+            _flag = true;
+        }
     }
 
-    public static void FlipEdge(HalfEdge edge)
+    public Delaunay(Vector3 p0)
     {
-        var (first, second, third, _) = edge.t.CollectHalfEdges();
-        var (fourth, fifth, sixth, _) = edge.twin.t.CollectHalfEdges();
+        _arr = new Graph();
+        super1 = new Vertex(Vector3.zero);
+        super2 = new Vertex(Vector3.zero);
+        Vertex v0 = _arr.AddVertex(p0);
+        // Create the super triangle
+        HalfEdge e1 = _AddEdge(super2, super1);
+        HalfEdge e2 = _AddEdge(super1, v0);
+        HalfEdge e3 = _AddEdge(v0, super2);
 
-        Vertex a = first.tail;
-        Vertex b = second.tail;
-        Vertex c = third.tail;
-        Vertex d = fifth.tail;
+        e1._nextEdge = e3.Twin;
+        e1.Twin._nextEdge = e2;
+        e2._nextEdge = e1.Twin;
+        e2.Twin._nextEdge = e3;
+        e3._nextEdge = e2.Twin;
+        e3.Twin._nextEdge = e1;
 
-        // Change the vertices
-        a.halfEdge = second;
-        c.halfEdge = fifth;
+        super2._halfEdge = e3.Twin;
+        super1._halfEdge = e1.Twin;
+        v0._halfEdge = e2.Twin;
 
-        first.SetNextPrev(third, fifth);
-        second.SetNextPrev(fourth, sixth);
-        third.SetNextPrev(fifth, first);
-        fourth.SetNextPrev(sixth, second);
-        fifth.SetNextPrev(first, third);
-        sixth.SetNextPrev(second, fourth);
-
-        first.tail = b;
-        second.tail = b;
-        third.tail = c;
-        fourth.tail = d;
-        fifth.tail = d;
-        sixth.tail = a;
-
-        Triangle t1 = first.t;
-        Triangle t2 = fourth.t;
-
-        t1.ReassignEdges(first, third, fifth);
-        t2.ReassignEdges(second, fourth, fifth);
+        _graph = new Triangle(e1);
     }
+
+    private HalfEdge _AddEdge(Vertex s, Vertex t)
+    {
+        HalfEdge e1 = _arr.AddHalfEdge(s, null, true);
+        HalfEdge e2 = _arr.AddHalfEdge(t, e1, false);
+        e1._twin = e2;
+        return e1;
+    }
+
+    private bool _LeftOf(Vector3 p, Vertex t, Vertex h) 
+    {
+        if (ReferenceEquals(t, super2)) 
+            return ReferenceEquals(h, super1) || Predicates.YOrder(h.V, p) == 1;
+        if (ReferenceEquals(t, super1))
+            return !ReferenceEquals(h, super2) && Predicates.YOrder(p, h.V) == 1;
+        if (ReferenceEquals(h, super2))
+            return Predicates.YOrder(p, t.V) == 1;
+        if (ReferenceEquals(h, super1))
+            return Predicates.YOrder(t.V, p) == 1;
+        return Predicates.LeftTurn(p, t.V, h.V) == 1;
+    }
+
+    public bool Contains(Vector3 p, Triangle tri)
+    {
+        return _LeftOf(p, tri.A, tri.B) && 
+               _LeftOf(p, tri.B, tri.C) &&
+               _LeftOf(p, tri.C, tri.A);
+    }
+
+    public Triangle Find(Vector3 p)
+    {
+        Triangle search = _graph;
+        while (!(search.Children[0] is null))
+        {
+            for (int i = 0; i < 3; ++i)
+            {
+                if(i == 2 || search.Children[i+1] is null || Contains(p, search.Children[i]))
+                {
+                    search = search.Children[i];
+                    break;
+                }
+            }
+        }
+        return search;
+    }
+
+    private void _Split(Vertex v, Triangle tri)
+    {
+        HalfEdge e = tri.Boundary[0];
+        HalfEdge f = e.Twin.Next;
+        HalfEdge g = f.Twin.Next;
+        Vertex a = e.Tail, b = f.Tail, c = g.Tail;
+        HalfEdge va = _AddEdge(v, a), vb = _AddEdge(v, b), vc = _AddEdge(v, c);
+        v._halfEdge = va;
+        vc._nextEdge = vb;
+        vb._nextEdge = va;
+        va._nextEdge = vc;
+        va.Twin._nextEdge = e;
+        vb.Twin._nextEdge = f;
+        vc.Twin._nextEdge = g;
+        e.Twin._nextEdge = vb.Twin;
+        f.Twin._nextEdge = vc.Twin;
+        g.Twin._nextEdge = va.Twin;
+        tri._children[0] = new Triangle(e);
+        tri._children[1] = new Triangle(f);
+        tri._children[2] = new Triangle(g);
+    }
+
+    private void _Flip(HalfEdge e)
+    {
+        Triangle tri1 = e.Face as Triangle, tri2 = e.Twin.Face as Triangle;
+        HalfEdge f = e.Twin.Next, g = f.Twin.Next, h = e.Next;
+        Vertex va = e.Tail, vb = f.Tail, vc = g.Tail, vd = h.Head;
+        _arr.RemoveEdge(e);
+        HalfEdge i = _AddEdge(vc, vd) ;
+        i._nextEdge = g;
+        f.Twin._nextEdge = i;
+        i.Twin._nextEdge = h.Twin.Next;
+        h.Twin._nextEdge = i.Twin;
+        tri1._children[0] = tri2._children[0] = new Triangle(i);
+        tri1._children[1] = tri2._children[1] = new Triangle(i.Twin);
+        tri2._flag = false;
+    }
+
+    private void _LegalizeEdge(Vertex v, HalfEdge edge)
+    {
+        if (!ReferenceEquals(edge.Twin.Next.Head, v))
+            edge = edge.Twin;
+        if (_Legal(edge))
+            return;
+
+        HalfEdge f = edge.Next, g = f.Twin.Next;
+        _Flip(edge);
+        _LegalizeEdge(v, f);
+        _LegalizeEdge(v, g);
+    }
+
+    private bool _Legal(HalfEdge e)
+    {
+        Vertex a = e.Tail, b= e.Head;
+        int i = _Index(a), j = _Index(b);
+
+        if (i <= 0 && j <= 0) // Inside the super triangle is always legal
+            return true;
+        
+        Vertex c = e.Twin.Next.Head, d = e.Next.Head;
+        int k = _Index(c), l = _Index(d);
+        int min_ij = Math.Min(i, j);
+        int min_kl = Math.Min(k, l);
+        if (min_ij < 0 || min_kl <0)
+        {
+            if (min_kl < min_ij) 
+                return true;
+        }
+        else 
+        {
+            if (GeometryHelpers.CirclePointLocation(a.V, b.V, c.V, d.V) == -1)
+                return true;
+        }
+
+        return _LeftOf(c.V, d, a) || _LeftOf(c.V, b, d);
+    }
+
+    private int _Index(Vertex v)
+    {
+        if (ReferenceEquals(v, super2))
+            return -2;
+        if (ReferenceEquals(v, super1))
+            return -1;
+        if (ReferenceEquals(v, _arr.Vertices[0]))
+            return 0;
+        return 1;
+    }
+
+
+    public void Insert(Vector3 p)
+    {
+        Vertex v = _arr.AddVertex(p);
+        Triangle face = Find(p);
+        HalfEdge e = face.Boundary[0];
+        HalfEdge f = e.Twin.Next;
+        HalfEdge g = f.Twin.Next;
+        _Split(v, face);
+        _LegalizeEdge(v, e);
+        _LegalizeEdge(v, f);
+        _LegalizeEdge(v, g);
+    }
+
+    private void _Finish()
+    {
+        void RemoveGraph(Triangle f)
+        {
+            if (f is null)
+                return;
+
+            if (!(f.Children[0] is null)) 
+            {
+                if (f._flag)
+                {
+                    foreach(var c in f.Children)
+                        RemoveGraph(c);
+                }
+                return;
+            }
+            bool looping = true;
+            HalfEdge e = f.Boundary[0];
+            while(looping)
+            {
+                looping = !ReferenceEquals(e.Tail, super1) && 
+                          !ReferenceEquals(e.Head, super1) && 
+                          !ReferenceEquals(e.Tail, super2) &&
+                          !ReferenceEquals(e.Head, super2);
+                e = e.Twin.Next;
+                if (ReferenceEquals(e, f.Boundary[0]))
+                    break;
+            }
+            if (looping) 
+            {
+                _arr._faces.Add(f);
+                return;
+            }
+            e = f.Boundary[0];
+
+            do 
+            {
+                e._face = null;
+                e = e.Twin.Next;
+            } 
+            while(!ReferenceEquals(e, f.Boundary[0]));
+        }
+
+        void RemoveVertex(Vertex v) 
+        {
+            var edges = v.Edge.Edges;
+            foreach(var e in edges)
+            {
+                _arr.RemoveEdge(e);
+            }
+        }
+
+        RemoveGraph(_graph);
+        RemoveVertex(super1);
+        RemoveVertex(super2);
+    }
+
+    public static Graph Generate(List<Vector3> points)
+    {
+        // Find the initial point
+        int imax = 0;
+        foreach (var (i, pt) in points.WithIndex()) 
+        {
+            if (Predicates.YOrder(points[imax], pt) == 1)        
+                imax = i;
+        }
+
+        var del = new Delaunay(points[imax]);
+
+        // Insert each point into the graph
+        foreach (var (i, pt) in points.WithIndex())
+        {
+            if (i != imax)
+                del.Insert(pt);
+        }
+
+        del._Finish();
+        return del._arr;
+    }
+
+
 }

@@ -42,7 +42,10 @@ public class MeshGenerator : MonoBehaviour
     [Button]
     public void Regenerate()
     {
+        Random.InitState(1);
         CreateShape();
+        var r = Delaunay.Generate(new List<Vector3>(_vertices));
+        Debug.Log("Done!");
     }
 
     private IEnumerable<Vector2> PlacePoints(int points, int maxIter)

@@ -6,6 +6,7 @@ using UnityEngine.Assertions;
 
 public static class GeometryHelpers
 {
+    /*
     public static List<HalfEdge> SetupHalfEdges(List<Triangle> triangles)
     {
         // Orient the triangles the same way
@@ -32,6 +33,7 @@ public static class GeometryHelpers
 
         return halfEdges;
     }
+    */
 
     /// <summary>
     /// Tests if a point is inside, outside or on a circle; 

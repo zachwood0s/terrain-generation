@@ -6,26 +6,21 @@ using UnityEngine;
 
 public class Vertex
 {
-    public Vector3 v;
-    private HalfEdge _halfEdge;
-    public Triangle triangle;
-    public Vertex prevVertex;
-    public Vertex nextVertex;
+    internal Vector3 _v;
+    internal HalfEdge _halfEdge;
 
-    public bool isReflex;
-    public bool isConvex;
-    public bool isEar;
+    public Vector3 V => _v;
 
     public HalfEdge Edge => _halfEdge;
 
     public Vertex(Vector3 pos)
     {
-        v = pos;
+        _v = pos;
     }
 
     public Vector2 Get2D()
     {
-        return new Vector2(v.x, v.z);
+        return new Vector2(_v.x, _v.z);
     }
 
     public void AddEdge(HalfEdge edge)
@@ -33,41 +28,51 @@ public class Vertex
         if (_halfEdge is null) 
         {
             _halfEdge = edge;
-            edge.nextEdge = edge;
+            edge._nextEdge = edge;
         }
         else if(edge.Clockwise(_halfEdge))
         {
-            edge.nextEdge = _halfEdge;
+            edge._nextEdge = _halfEdge;
             var last = _halfEdge.Edges.Last();
-            last.nextEdge = edge;
+            last._nextEdge = edge;
             _halfEdge = edge;
         }
         else 
         {                
-            var f = _halfEdge.Edges.SkipWhile(x => x.nextEdge.Clockwise(edge)).First();
-            edge.nextEdge = f.nextEdge;
-            f.nextEdge = edge;
+            var f = _halfEdge.Edges.SkipWhile(x => x._nextEdge.Clockwise(edge)).First();
+            edge._nextEdge = f._nextEdge;
+            f._nextEdge = edge;
         }
     }
 
     public void RemoveEdge(HalfEdge e)
     {
-        if (ReferenceEquals(_halfEdge, e) && ReferenceEquals(e.nextEdge, e))
+        if (ReferenceEquals(_halfEdge, e) && ReferenceEquals(e._nextEdge, e))
         {
             _halfEdge = null;
         }
+        else if(!(_halfEdge is null))
+        {
+            try {
+                // Find the edge right before the one being removed in the list
+                var last = _halfEdge.Edges.Where(x => ReferenceEquals(x.Next, e)).First();
+                // Reassign to skip the removed edge
+                last._nextEdge = e._nextEdge;
+
+                // Reassign the half edge if necessary
+                if (ReferenceEquals(_halfEdge, e))
+                {
+                    _halfEdge = last;
+                }
+            }
+            catch (System.Exception ep)
+            {                    
+                Debug.Log("Didn't find edge!");
+            }
+        }
         else 
         {
-            // Find the edge right before the one being removed in the list
-            var last = _halfEdge.Edges.SkipWhile(x => !ReferenceEquals(x.nextEdge, e)).First();
-            // Reassign to skip the removed edge
-            last.nextEdge = e.nextEdge;
-
-            // Reassign the half edge if necessary
-            if (ReferenceEquals(_halfEdge, e))
-            {
-                _halfEdge = last;
-            }
+            Debug.Log("No edges to remove!");
         }
 
     }
@@ -75,17 +80,21 @@ public class Vertex
 
 public class HalfEdge 
 {
-    private Vertex _tail;
-    private Triangle _t;
-    private HalfEdge _twin;
-    private bool _incomming;
+    internal Vertex _tail;
+    internal Face _face;
+    internal HalfEdge _twin;
+    internal bool _incomming;
 
-    public HalfEdge nextEdge;
+    internal HalfEdge _nextEdge;
 
     public Vertex Tail => _tail;
     public Vertex Head => _twin._tail;
 
+    public Face Face => _face;
+
     public HalfEdge Twin => _twin;
+
+    public HalfEdge Next => _nextEdge;
 
 
     public HalfEdge(Vertex _v) 
@@ -96,9 +105,9 @@ public class HalfEdge
     public IEnumerable<HalfEdge> Edges {
         get {
             HalfEdge f = this;
-            while (f.nextEdge != this) {
+            while (f._nextEdge != this) {
                 yield return f;
-                f = f.nextEdge;
+                f = f._nextEdge;
             }
             yield return f;
         }
@@ -108,175 +117,55 @@ public class HalfEdge
         Tail == edge.Tail || Tail == edge.Head || 
         Head == edge.Tail || Head == edge.Head;
 
-    public bool IncreasingX() => Predicates.XOrder(Tail.v, Head.v) == 1;
+    public bool IncreasingX() => Predicates.XOrder(Tail._v, Head._v) == 1;
 
-    public bool IncreasingY() => Predicates.YOrder(Tail.v, Head.v) == 1;
+    public bool IncreasingY() => Predicates.YOrder(Tail._v, Head._v) == 1;
 
     public bool Clockwise(HalfEdge edge) 
     {
         bool inc = IncreasingY(), otherInc = edge.IncreasingY();
-        return inc != otherInc ? inc : Predicates.LeftTurn(Head.v, Tail.v, edge.Head.v) == 1;
+        return inc != otherInc ? inc : Predicates.LeftTurn(Head._v, Tail._v, edge.Head._v) == 1;
     }
 
     public bool Outer()
     {
-        HalfEdge f = Twin.nextEdge;
-        return f != Twin && Predicates.LeftTurn(Tail.v, Head.v, f.Head.v) == 1;
-    }
-}
-
-public class Triangle 
-{
-    public Vertex v1;
-    public Vertex v2;
-    public Vertex v3;
-
-    public HalfEdge halfEdge;
-
-    public Triangle(Vertex _v1, Vertex _v2, Vertex _v3) 
-    {
-        v1 = _v1;
-        v2 = _v2;
-        v3 = _v3;
-    }
-
-    public Triangle(Vector3 _v1, Vector3 _v2, Vector3 _v3)
-    {
-        v1 = new Vertex(_v1);
-        v2 = new Vertex(_v2);
-        v3 = new Vertex(_v3);
-    }
-
-    public Triangle(HalfEdge edge)
-    {
-        halfEdge = edge;
-    }
-
-    public void SetVerts(Vertex _v1, Vertex _v2, Vertex _v3)
-    {
-        v1 = _v1;
-        v2 = _v2;
-        v3 = _v3;
-    }
-
-    public void FlipDirection()
-    {
-        // Swap the vertices
-        (v1, v2) = (v2, v1);
-    }
-
-    /// <summary>
-    /// Sets up this triangles half edges (if necessary) and returns
-    /// each edge in order;
-    /// </summary>
-    /// <returns></returns>
-    public IEnumerable<HalfEdge> CollectHalfEdges()
-    {
-        /*
-        HalfEdge h1, h2, h3;
-        if(halfEdge == null)
-        {
-            h1 = new HalfEdge(v1);
-            h2 = new HalfEdge(v2);
-            h3 = new HalfEdge(v3);
-
-            h1.nextEdge = h2;
-            h2.nextEdge = h3;
-            h3.nextEdge = h1;
-
-            h1.nextEdge = h3;
-            h2.nextEdge = h1;
-            h3.nextEdge = h2;
-
-            h1.Tail.halfEdge = h2;
-            h2.Tail.halfEdge = h3;
-            h3.Tail.halfEdge = h1;
-
-            halfEdge = h1;
-
-            h1.t = this;
-            h2.t = this;
-            h3.t = this;
-
-        }
-        else {
-            h1 = halfEdge;
-            h2 = halfEdge.nextEdge;
-            h3 = halfEdge.prevEdge;
-        }
-
-        yield return h1;
-        yield return h2;
-        yield return h3;
-        */
-        return null;
-    }
-
-    public void ReassignEdges(HalfEdge h1, HalfEdge h2, HalfEdge h3)
-    {
-        /*
-        h1.t = this;
-        h2.t = this;
-        h3.t = this;
-
-        halfEdge = h1;
-
-        v1 = h1.tail;
-        v2 = h2.tail;
-        v3 = h3.tail;
-        */
-    }
-
-    public void MakeClockwise()
-    {
-        if (!IsClockwise())
-        {
-            FlipDirection();
-        }
-    }
-
-    public bool IsClockwise()
-    {
-        bool isClockwise = true;
-
-        float determinant = v1.v.x * v2.v.y + v3.v.x * v1.v.y + v2.v.x * v3.v.y - 
-                            v1.v.x * v3.v.y - v3.v.x * v2.v.y - v2.v.x * v1.v.y;
-
-        if (determinant > 0f)
-        {
-            isClockwise = false;
-        }
-
-        return isClockwise;
+        HalfEdge f = Twin._nextEdge;
+        return f != Twin && Predicates.LeftTurn(Tail._v, Head._v, f.Head._v) == 1;
     }
 }
 
 public class Face 
 {
-    public Vector3 pos;
-    public Vector3 normal;
+    protected internal List<HalfEdge> _boundary;
 
-    public Face(Vector3 _pos, Vector3 _normal)
+    public IReadOnlyList<HalfEdge> Boundary => _boundary;
+
+    public Face()
     {
-        pos = _pos;
-        normal = _normal;
+        _boundary = new List<HalfEdge>();
     }
 }
 
 public class Graph
 {
-    List<Vertex> vertices;
-    List<HalfEdge> edges;
-    List<Triangle> triangles;
+    internal List<Vertex> _vertices;
+    internal List<HalfEdge> _edges;
+    internal List<Face> _faces;
 
-    IReadOnlyList<Vertex> Vertices => vertices;
-    IReadOnlyList<HalfEdge> Edges => edges;
-    IReadOnlyList<Triangle> Triangles => triangles;
+    public IReadOnlyList<Vertex> Vertices => _vertices;
+    public IReadOnlyList<HalfEdge> Edges => _edges;
+    public IReadOnlyList<Face> Triangles => _faces;
 
+    public Graph()
+    {
+        _vertices = new List<Vertex>();
+        _edges = new List<HalfEdge>();
+        _faces = new List<Face>();
+    }
     public Vertex AddVertex(Vector3 p) 
     {
         var v = new Vertex(p);
-        vertices.Add(v);
+        _vertices.Add(v);
         return v;
     }
 
@@ -284,15 +173,23 @@ public class Graph
     {
         var e = AddHalfEdge(tail, null, true);
         var et = AddHalfEdge(head, e, false);
-        e.twin = et;
+        e._twin = et;
+        return e;
     }
 
     public HalfEdge AddHalfEdge(Vertex tail, HalfEdge twin, bool incomming)
     {
         var e = new HalfEdge(tail);
-        e.twin = twin;
-        e.incomming = incomming;
-        edges.Add(e);
+        e._twin = twin;
+        e._incomming = incomming;
+        _edges.Add(e);
         return e;
+    }
+
+    public void RemoveEdge(HalfEdge e)
+    {
+        _edges.RemoveAll(x => ReferenceEquals(x, e) || ReferenceEquals(x, e.Twin));
+        e.Tail.RemoveEdge(e);
+        e.Twin.Tail.RemoveEdge(e.Twin);
     }
 }
