@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Assertions;
 using EasyButtons;
@@ -18,18 +19,14 @@ public class MeshGenerator : MonoBehaviour
     public int zWidth = 20;
 
     public int yScaling = 20;
+    public int seed = 1234;
 
     public Texture2D heightmap;
     public Texture2D densitymap;
 
     void Start()
     {
-        _mesh = new Mesh();
-        GetComponent<MeshFilter>().mesh = _mesh;
-
-        CreateShape();
-        UpdateMesh();
-
+        Regenerate();
     }
 
     // Update is called once per frame
@@ -42,9 +39,12 @@ public class MeshGenerator : MonoBehaviour
     [Button]
     public void Regenerate()
     {
-        Random.InitState(1);
+        _mesh = new Mesh();
+        GetComponent<MeshFilter>().mesh = _mesh;
+
+        Random.InitState(seed);
         CreateShape();
-        var r = Delaunay.Generate(new List<Vector3>(_vertices));
+        UpdateMesh();
         Debug.Log("Done!");
     }
 
@@ -82,6 +82,8 @@ public class MeshGenerator : MonoBehaviour
         Assert.AreEqual(heightmap.height, densitymap.height);
 
         _vertices = new Vector3[resolution];
+        var verts2d = new Vector2[resolution];
+        Dictionary<Vector2, int> lookup = new Dictionary<Vector2, int>();
 
         foreach (var (i, point) in PlacePoints(resolution, 100000).WithIndex())
         {
@@ -91,12 +93,44 @@ public class MeshGenerator : MonoBehaviour
             float z = (point.y / (float)heightmap.height) * zWidth;
 
             _vertices[i] = new Vector3(x, yValue, z);
+            verts2d[i] = point;
+            lookup[point] = i;
         }
+
+        var r = Delaunay.Generate(new List<Vector2>(verts2d));
+        _triangles = new int[r.Triangles.Count * 3];
+
+        int vert = 0;
+        foreach(var t in r.Triangles.Cast<Delaunay.Triangle>())
+        {
+
+            Vector2 a = t.A.V, b = t.B.V, c = t.C.V;
+            int aidx = lookup[a], bidx = lookup[b], cidx = lookup[c];
+            Vector3 a3 = _vertices[aidx], b3 = _vertices[bidx], c3 = _vertices[cidx];
+            Vector3 normal = Vector3.Cross(b3 - a3, c3 - a3).normalized;
+
+            if (normal.y < 0)
+            {
+                (bidx, cidx) = (cidx, bidx);
+                Debug.Log("flipped!");
+            }
+                
+            _triangles[vert + 0] = aidx;
+            _triangles[vert + 1] = bidx;
+            _triangles[vert + 2] = cidx;
+            vert += 3;
+        }
+
     }
 
     void UpdateMesh()
     {
+        _mesh.Clear();
 
+        _mesh.vertices = _vertices;
+        _mesh.triangles = _triangles;
+
+        _mesh.RecalculateNormals();
     }
 
     private void OnDrawGizmos()

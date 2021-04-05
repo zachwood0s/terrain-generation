@@ -45,19 +45,20 @@ public static class GeometryHelpers
     /// <returns>Positive if inside, negative if outside, 0 if on</returns>
     public static float CirclePointLocation(Vector2 av, Vector2 bv, Vector2 cv, Vector2 p)
     {
-        float a = av.x - p.x;
-        float d = bv.x - p.x;
-        float g = cv.x - p.x;
+        float a1 = av.x - p.x;
+        float b1 = bv.x - p.x;
+        float c1 = cv.x - p.x;
 
-        float b = av.y - p.y;
-        float e = bv.y - p.y;
-        float h = cv.y - p.y;
+        float a2 = av.y - p.y;
+        float b2 = bv.y - p.y;
+        float c2 = cv.y - p.y;
 
-        float c = a * a + b * b;
-        float f = d * d + e * e;
-        float i = g * g + h * h;
+        float a3 = a1 * a1 + a2 * a2;
+        float b3 = b1 * b1 + b2 * b2;
+        float c3 = c1 * c1 + c2 * c2;
 
-        float determinant = (a * e * i) + (b * f * g) + (c * d * h) - (g * e * c) - (h * f * a) - (i * d * b);
+        //float determinant = (a * e * i) + (b * f * g) + (c * d * h) - (g * e * c) - (h * f * a) - (i * d * b);
+        float determinant = a1 * (b2 * c3 - b3 * c2) - a2 * (b1 * c3 - b3 * c1) + a3 * (b1 * c2 - b2 * c1);
 
         return determinant;
     }

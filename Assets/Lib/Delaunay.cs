@@ -39,13 +39,21 @@ public class Delaunay
             _children[0] = _children[1] = _children[2] = null;
             _flag = true;
         }
+
+        public Triangle Flipped() => new Triangle(Boundary[0]) {
+            _a = this.A,
+            _b = this.C,
+            _c = this.B,
+        };
+
+        public override string ToString() => $"{A}, {B}, {C}";
     }
 
-    public Delaunay(Vector3 p0)
+    public Delaunay(Vector2 p0)
     {
         _arr = new Graph();
-        super1 = new Vertex(Vector3.zero);
-        super2 = new Vertex(Vector3.zero);
+        super1 = new Vertex(Vector2.zero);
+        super2 = new Vertex(Vector2.zero);
         Vertex v0 = _arr.AddVertex(p0);
         // Create the super triangle
         HalfEdge e1 = _AddEdge(super2, super1);
@@ -74,7 +82,7 @@ public class Delaunay
         return e1;
     }
 
-    private bool _LeftOf(Vector3 p, Vertex t, Vertex h) 
+    private bool _LeftOf(Vector2 p, Vertex t, Vertex h) 
     {
         if (ReferenceEquals(t, super2)) 
             return ReferenceEquals(h, super1) || Predicates.YOrder(h.V, p) == 1;
@@ -87,17 +95,17 @@ public class Delaunay
         return Predicates.LeftTurn(p, t.V, h.V) == 1;
     }
 
-    public bool Contains(Vector3 p, Triangle tri)
+    public bool Contains(Vector2 p, Triangle tri)
     {
         return _LeftOf(p, tri.A, tri.B) && 
                _LeftOf(p, tri.B, tri.C) &&
                _LeftOf(p, tri.C, tri.A);
     }
 
-    public Triangle Find(Vector3 p)
+    public Triangle Find(Vector2 p)
     {
         Triangle search = _graph;
-        while (!(search.Children[0] is null))
+        while (search.Children[0] != null)
         {
             for (int i = 0; i < 3; ++i)
             {
@@ -174,15 +182,11 @@ public class Delaunay
         int k = _Index(c), l = _Index(d);
         int min_ij = Math.Min(i, j);
         int min_kl = Math.Min(k, l);
-        if (min_ij < 0 || min_kl <0)
+        if (min_ij < 0 || min_kl <0 
+                ? min_kl < min_ij 
+                : GeometryHelpers.CirclePointLocation(a.V, b.V, c.V, d.V) == -1 )
         {
-            if (min_kl < min_ij) 
-                return true;
-        }
-        else 
-        {
-            if (GeometryHelpers.CirclePointLocation(a.V, b.V, c.V, d.V) == -1)
-                return true;
+            return true;
         }
 
         return _LeftOf(c.V, d, a) || _LeftOf(c.V, b, d);
@@ -200,7 +204,7 @@ public class Delaunay
     }
 
 
-    public void Insert(Vector3 p)
+    public void Insert(Vector2 p)
     {
         Vertex v = _arr.AddVertex(p);
         Triangle face = Find(p);
@@ -220,7 +224,7 @@ public class Delaunay
             if (f is null)
                 return;
 
-            if (!(f.Children[0] is null)) 
+            if (f.Children[0] != null) 
             {
                 if (f._flag)
                 {
@@ -258,10 +262,18 @@ public class Delaunay
 
         void RemoveVertex(Vertex v) 
         {
-            var edges = v.Edge.Edges;
-            foreach(var e in edges)
+            List<HalfEdge> edges = new List<HalfEdge>();
+            var e = v.Edge;
+            do 
             {
-                _arr.RemoveEdge(e);
+                edges.Add(e);
+                e = e.Next;
+            }
+            while (e != v.Edge);
+
+            foreach(var f in edges)
+            {
+                _arr.RemoveEdge(f);
             }
         }
 
@@ -270,7 +282,7 @@ public class Delaunay
         RemoveVertex(super2);
     }
 
-    public static Graph Generate(List<Vector3> points)
+    public static Graph Generate(List<Vector2> points)
     {
         // Find the initial point
         int imax = 0;
