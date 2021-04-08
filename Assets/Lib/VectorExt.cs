@@ -6,6 +6,6 @@ public static class VectorExt
 {
     public static float Cross(this Vector2 a, Vector2 b) 
     {
-        return a.x * b.y - a.y - b.x;
+        return a.x * b.y - a.y * b.x;
     }
 }

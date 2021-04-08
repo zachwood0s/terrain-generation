@@ -93,7 +93,7 @@ public class Vertex
         }
     }
 
-    public override string ToString() => _v.ToString();
+    public override string ToString() => $"({_v.x:F6} {_v.y:F6})";
     
 }
 

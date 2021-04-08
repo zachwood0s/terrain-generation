@@ -86,4 +86,6 @@ public static class Predicates
 
     public static int CCW(Vector2 a, Vector2 b) => (a.Cross(b)).Sign();
 
+    public static int PointInCircumcircle(Vector2 av, Vector2 bv, Vector2 cv, Vector2 p) =>
+        GeometryHelpers.CirclePointLocation(av, bv, cv, p).Sign();
 }

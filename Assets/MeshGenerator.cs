@@ -1,5 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Assertions;
@@ -93,11 +95,13 @@ public class MeshGenerator : MonoBehaviour
             float z = (point.y / (float)heightmap.height) * zWidth;
 
             _vertices[i] = new Vector3(x, yValue, z);
-            verts2d[i] = point;
-            lookup[point] = i;
+            verts2d[i] = new Vector2(x, z);
+            lookup[verts2d[i]] = i;
         }
 
-        var r = Delaunay.Generate(new List<Vector2>(verts2d));
+        WritePointsToFile(verts2d);
+
+        var r = Delaunay.Generate(verts2d.ToList());
         _triangles = new int[r.Triangles.Count * 3];
 
         int vert = 0;
@@ -112,7 +116,6 @@ public class MeshGenerator : MonoBehaviour
             if (normal.y < 0)
             {
                 (bidx, cidx) = (cidx, bidx);
-                Debug.Log("flipped!");
             }
                 
             _triangles[vert + 0] = aidx;
@@ -121,6 +124,13 @@ public class MeshGenerator : MonoBehaviour
             vert += 3;
         }
 
+    }
+
+    void WritePointsToFile(Vector2[] points)
+    {
+        var lines = points.Select(x => $"{x.x} {x.y}");
+        lines = lines.Prepend(points.Length.ToString());
+        File.WriteAllLines("Assets/points.txt", lines);
     }
 
     void UpdateMesh()
