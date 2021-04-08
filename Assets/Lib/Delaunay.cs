@@ -85,13 +85,27 @@ public class Delaunay
     private bool _LeftOf(Vector2 p, Vertex t, Vertex h) 
     {
         if (ReferenceEquals(t, super2)) 
-            return ReferenceEquals(h, super1) || Predicates.YOrder(h.V, p) == 1;
+        {
+            Debug.Log("Took 1");
+            return ReferenceEquals(h, super1) || Predicates.YOrder(h.V, p) >= 0;
+        }
         if (ReferenceEquals(t, super1))
-            return !ReferenceEquals(h, super2) && Predicates.YOrder(p, h.V) == 1;
+        {
+            Debug.Log("Took 2");
+            // TODO: Potential colinear point problem
+            return !ReferenceEquals(h, super2) && Predicates.YOrder(p, h.V) >= 0;
+        }
         if (ReferenceEquals(h, super2))
-            return Predicates.YOrder(p, t.V) == 1;
+        {
+            Debug.Log("Took 3");
+            return Predicates.YOrder(p, t.V) >= 0;
+        }
         if (ReferenceEquals(h, super1))
-            return Predicates.YOrder(t.V, p) == 1;
+        {
+            Debug.Log("Took 4");
+            return Predicates.YOrder(t.V, p) >= 0;
+        }
+        Debug.Log("Took 5");
         return Predicates.LeftTurn(p, t.V, h.V) == 1;
     }
 
@@ -109,9 +123,14 @@ public class Delaunay
         {
             for (int i = 0; i < 3; ++i)
             {
+                var tri = search.Children[i];
+                Debug.Log(tri);
+                Debug.Log($"{_LeftOf(p, tri.A, tri.B)} {_LeftOf(p, tri.B, tri.C)} {_LeftOf(p, tri.C, tri.A)}");
                 if(i == 2 || (search.Children[i+1] is null) || Contains(p, search.Children[i]))
                 {
+                    Debug.Log($"using child {i}");
                     search = search.Children[i];
+                    Debug.Log(search.ToString());
                     break;
                 }
             }
@@ -193,7 +212,6 @@ public class Delaunay
                 ? min_kl < min_ij 
                 : Predicates.PointInCircumcircle(a.V, b.V, c.V, d.V) == -1 )
         {
-            Debug.Log("circle");
             return true;
         }
 
@@ -215,15 +233,21 @@ public class Delaunay
     public void Insert(Vector2 p)
     {
         Vertex v = _arr.AddVertex(p);
+        Debug.Log($"searching... {p.x} {p.y}");
         Triangle face = Find(p);
         Debug.Log($"found: {face}");
         HalfEdge e = face.Boundary[0];
         HalfEdge f = e.Twin.Next;
         HalfEdge g = f.Twin.Next;
         _Split(v, face);
-        _LegalizeEdge(v, e);
-        _LegalizeEdge(v, f);
-        _LegalizeEdge(v, g);
+        try{
+            _LegalizeEdge(v, e);
+            _LegalizeEdge(v, f);
+            _LegalizeEdge(v, g);
+        } catch (StackOverflowException ex)
+        {
+            Debug.Log("failed to legalize edge");
+        }
     }
 
     private void _Finish()

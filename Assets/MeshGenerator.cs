@@ -20,7 +20,7 @@ public class MeshGenerator : MonoBehaviour
     public int xWidth = 20;
     public int zWidth = 20;
 
-    public int yScaling = 20;
+    public float yScaling = 20;
     public int seed = 1234;
 
     public Texture2D heightmap;
