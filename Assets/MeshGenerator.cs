@@ -15,7 +15,13 @@ public class MeshGenerator : MonoBehaviour
 
     private Vector3[] _vertices;
     private int[] _triangles;
+    private Color[] _colors;
 
+    private float _minHeight;
+    private float _maxHeight;
+
+
+    [Header("Terrain Settings")]
     public int resolution = 2000;
     public int xWidth = 20;
     public int zWidth = 20;
@@ -26,6 +32,14 @@ public class MeshGenerator : MonoBehaviour
     public Texture2D heightmap;
     public Texture2D densitymap;
 
+    public Gradient gradient;
+
+
+    [Header("Triangulation Settings")]
+    public float minAngle = 0.0f;
+    public float maxAngle = 0.0f;
+
+
     void Start()
     {
         Regenerate();
@@ -34,7 +48,7 @@ public class MeshGenerator : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-
+        UpdateMesh();
     }
 
 
@@ -50,32 +64,6 @@ public class MeshGenerator : MonoBehaviour
         Debug.Log("Done!");
     }
 
-    private IEnumerable<Vector2> PlacePoints(int points, int maxIter)
-    {
-        var (min, max) = densitymap.GetMinMax();
-
-        for (int iterCount = 0, i = 0; i < points && iterCount < maxIter; iterCount++)
-        {
-            float randx = Random.Range(0, densitymap.width);
-            float randy = Random.Range(0, densitymap.height);
-
-            float cutoff = 1 - densitymap.GetPixel((int)randx, (int)randy).grayscale;
-            cutoff = Mathf.Clamp(cutoff, min, max);
-            float decide = Random.Range(min, max);
-
-            if (decide >= cutoff)
-            {
-                yield return new Vector2(randx, randy);
-                i++;
-                //Debug.Log($"Added {i}, {decide}, {cutoff} points");
-            }
-            else
-            {
-                //Debug.Log($"Skipped {i}, {decide}, {cutoff}");
-            }
-        }
-    }
-
     void CreateShape()
     {
         Assert.IsNotNull(heightmap);
@@ -87,7 +75,7 @@ public class MeshGenerator : MonoBehaviour
         var verts2d = new Vector2[resolution];
         Dictionary<Vector2, int> lookup = new Dictionary<Vector2, int>();
 
-        foreach (var (i, point) in PlacePoints(resolution, 100000).WithIndex())
+        foreach (var (i, point) in PointGeneration.PlacePoints(resolution, 100000, densitymap).WithIndex())
         {
             float yValue = heightmap.GetPixel((int)point.x, (int)point.y).grayscale * yScaling;
 
@@ -124,6 +112,10 @@ public class MeshGenerator : MonoBehaviour
             vert += 3;
         }
 
+        _maxHeight = _vertices.Max(x => x.y);
+        _minHeight = _vertices.Min(x => x.y);
+
+        _colors = new Color[verts2d.Length];
     }
 
     void WritePointsToFile(Vector2[] points)
@@ -135,10 +127,17 @@ public class MeshGenerator : MonoBehaviour
 
     void UpdateMesh()
     {
+        for (int i = 0; i < _vertices.Length; i++)
+        {
+            float height = Mathf.InverseLerp(_minHeight, _maxHeight, _vertices[i].y);
+            _colors[i] = gradient.Evaluate(height);
+        }
+
         _mesh.Clear();
 
         _mesh.vertices = _vertices;
         _mesh.triangles = _triangles;
+        _mesh.colors = _colors;
 
         _mesh.RecalculateNormals();
     }
