@@ -647,7 +647,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5fc5a679be1d4a542a7d8e127f116422, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  resolution: 1011
+  resolution: 3
   xWidth: 40
   zWidth: 40
   yScaling: 10
@@ -683,6 +683,10 @@ MonoBehaviour:
     m_Mode: 0
     m_NumColorKeys: 2
     m_NumAlphaKeys: 2
+  quality:
+    minAngle: 0
+    maxAngle: 180
+    maxSteiner: -1
 --- !u!23 &1226303832
 MeshRenderer:
   m_ObjectHideFlags: 0

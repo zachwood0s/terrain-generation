@@ -36,8 +36,7 @@ public class MeshGenerator : MonoBehaviour
 
 
     [Header("Triangulation Settings")]
-    public float minAngle = 0.0f;
-    public float maxAngle = 0.0f;
+    public Quality quality;
 
 
     void Start()
@@ -71,51 +70,59 @@ public class MeshGenerator : MonoBehaviour
         Assert.AreEqual(heightmap.width, densitymap.width);
         Assert.AreEqual(heightmap.height, densitymap.height);
 
+        var d = Delaunay.Generate(new List<Vector2>{new Vector2(0.0f, 0.0f), new Vector2(10.0f, 0.0f), new Vector2(5.0f, 5.0f)});
+        d.Insert(new Vector2(5.0f, 0.0f), d.Graph.Edges[8]);
+
+        d.Finish(false);
+        var r = d.Graph;
+
+
         _vertices = new Vector3[resolution];
-        var verts2d = new Vector2[resolution];
-        Dictionary<Vector2, int> lookup = new Dictionary<Vector2, int>();
+        var verts2d = PointGeneration.PlacePoints(resolution, 100000, densitymap).ToList();
 
-        foreach (var (i, point) in PointGeneration.PlacePoints(resolution, 100000, densitymap).WithIndex())
-        {
-            float yValue = heightmap.GetPixel((int)point.x, (int)point.y).grayscale * yScaling;
+        WritePointsToFile(verts2d.ToArray());
 
-            float x = (point.x / (float)heightmap.width) * xWidth;
-            float z = (point.y / (float)heightmap.height) * zWidth;
-
-            _vertices[i] = new Vector3(x, yValue, z);
-            verts2d[i] = new Vector2(x, z);
-            lookup[verts2d[i]] = i;
-        }
-
-        WritePointsToFile(verts2d);
-
-        var r = Delaunay.Generate(verts2d.ToList());
+        //var r = Mesher.Triangulate(verts2d, quality);
+        _vertices = new Vector3[r.Triangles.Count * 3];
         _triangles = new int[r.Triangles.Count * 3];
 
+        var tris = r.Triangles.Cast<Delaunay.Triangle>();
         int vert = 0;
-        foreach(var t in r.Triangles.Cast<Delaunay.Triangle>())
+        foreach (var (i, tri) in tris.WithIndex())
         {
+            Vector3 a = ConvertPoint(tri.A.V), b = ConvertPoint(tri.B.V), c = ConvertPoint(tri.C.V);
+            int aind = vert + 0, bind = vert + 1, cind = vert + 2;
 
-            Vector2 a = t.A.V, b = t.B.V, c = t.C.V;
-            int aidx = lookup[a], bidx = lookup[b], cidx = lookup[c];
-            Vector3 a3 = _vertices[aidx], b3 = _vertices[bidx], c3 = _vertices[cidx];
-            Vector3 normal = Vector3.Cross(b3 - a3, c3 - a3).normalized;
+            Vector3 normal = Vector3.Cross(b - a, c - a).normalized;
 
             if (normal.y < 0)
             {
-                (bidx, cidx) = (cidx, bidx);
+                (bind, cind) = (cind, bind);
             }
-                
-            _triangles[vert + 0] = aidx;
-            _triangles[vert + 1] = bidx;
-            _triangles[vert + 2] = cidx;
+
+            _vertices[vert + 0] = a;
+            _vertices[vert + 1] = b;
+            _vertices[vert + 2] = c;
+            _triangles[vert + 0] = aind;
+            _triangles[vert + 1] = bind;
+            _triangles[vert + 2] = cind;
             vert += 3;
         }
 
         _maxHeight = _vertices.Max(x => x.y);
         _minHeight = _vertices.Min(x => x.y);
 
-        _colors = new Color[verts2d.Length];
+        _colors = new Color[_vertices.Length];
+    }
+
+    private Vector3 ConvertPoint(Vector2 point)
+    {
+        float yValue = heightmap.GetPixel((int)point.x, (int)point.y).grayscale * yScaling;
+
+        float x = (point.x / (float)heightmap.width) * xWidth;
+        float z = (point.y / (float)heightmap.height) * zWidth;
+
+        return new Vector3(x, yValue, z);
     }
 
     void WritePointsToFile(Vector2[] points)

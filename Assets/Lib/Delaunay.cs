@@ -9,9 +9,11 @@ public class Delaunay
 {
     private Graph _arr;
 
-    private Vertex super1, super2;
+    internal Vertex super1, super2;
 
     private Triangle _graph;
+
+    public Graph Graph => _arr;
 
     public class Triangle: Face {
         private Vertex _a, _b, _c;
@@ -53,7 +55,9 @@ public class Delaunay
     {
         _arr = new Graph();
         super1 = new Vertex(Vector2.zero);
+        super1.isDummy = true;
         super2 = new Vertex(Vector2.zero);
+        super2.isDummy = true;
         Vertex v0 = _arr.AddVertex(p0);
         // Create the super triangle
         HalfEdge e1 = _AddEdge(super2, super1);
@@ -73,6 +77,9 @@ public class Delaunay
 
         _graph = new Triangle(e1);
     }
+
+    public bool IsDummy(Vertex v) => ReferenceEquals(v, super1) || ReferenceEquals(v, super2);
+    public bool IsDummy(HalfEdge e) => IsDummy(e.Head) && IsDummy(e.Twin);
 
     private HalfEdge _AddEdge(Vertex s, Vertex t)
     {
@@ -192,6 +199,7 @@ public class Delaunay
         _LegalizeEdge(v, g);
     }
 
+
     private bool _Legal(HalfEdge e)
     {
         //Debug.Log($"checking legality: {e}");
@@ -240,13 +248,208 @@ public class Delaunay
         HalfEdge f = e.Twin.Next;
         HalfEdge g = f.Twin.Next;
         _Split(v, face);
+        /*
         _LegalizeEdge(v, e);
         _LegalizeEdge(v, f);
         _LegalizeEdge(v, g);
+        */
     }
 
-    private void _Finish()
+    /// <summary>
+    /// Insert a point where the point lies perfectly on an edge
+    /// </summary>
+    /// <param name="p"></param>
+    /// <param name="edge"></param>
+    public HalfEdge Insert(Vector2 p, HalfEdge e)
     {
+        Assert.IsFalse(IsDummy(e));
+
+        Vertex v = _arr.AddVertex(p);
+
+        Triangle tri1 = e.Face as Triangle, tri2 = e.Twin.Face as Triangle;
+        if (tri1 is null)
+        {
+            tri1 = new Triangle(e);
+        }
+        if (tri2 is null)
+        {
+            tri2 = new Triangle(e.Twin);
+        }
+
+        if (tri1 != null && tri2 != null)
+        {
+            // Split into 4 triangles
+            return _Split4(v, e, tri1, tri2);
+        }
+        else {
+
+        }
+
+        return e;
+        /*
+        HalfEdge e = tri.Boundary[0];
+        HalfEdge f = e.Twin.Next;
+        HalfEdge g = f.Twin.Next;
+        Vertex a = e.Tail, b = f.Tail, c = g.Tail;
+        HalfEdge va = _AddEdge(v, a), vb = _AddEdge(v, b), vc = _AddEdge(v, c);
+        v._halfEdge = va;
+        vc._nextEdge = vb;
+        vb._nextEdge = va;
+        va._nextEdge = vc;
+        va.Twin._nextEdge = e;
+        vb.Twin._nextEdge = f;
+        vc.Twin._nextEdge = g;
+        e.Twin._nextEdge = vb.Twin;
+        f.Twin._nextEdge = vc.Twin;
+        g.Twin._nextEdge = va.Twin;
+        tri._children[0] = new Triangle(e);
+        tri._children[1] = new Triangle(f);
+        tri._children[2] = new Triangle(g);
+        */
+    }
+
+    private HalfEdge _Split2(Vertex v, HalfEdge e, Triangle tri)
+    {
+        HalfEdge f = e.Twin.Next, g = f.Twin.Next;
+        Vertex a = e.Tail, b = f.Tail, c = g.Tail;
+        _arr.RemoveEdge(e);
+        HalfEdge va = _AddEdge(v, a), vb = _AddEdge(v, b), vc = _AddEdge(v, c);
+        v._halfEdge = va;
+        vc._nextEdge = vb;
+        vb._nextEdge = va;
+        va._nextEdge = vc;
+        va.Twin._nextEdge = g.Twin;
+        vb.Twin._nextEdge = f;
+        vc.Twin._nextEdge = g;
+        f.Twin._nextEdge = vc.Twin;
+        g.Twin._nextEdge = va.Twin;
+        tri._children[0] = new Triangle(f);
+        tri._children[1] = new Triangle(g);
+        return va;
+    }
+
+    private HalfEdge _Split4(Vertex v, HalfEdge e, Triangle t1, Triangle t2)
+    {
+        HalfEdge f = e.Twin.Next, g = f.Twin.Next, h = e.Next, i = h.Twin.Next;
+        Vertex a = e.Tail, b = f.Tail, c = g.Tail, d = h.Head;
+        _arr.RemoveEdge(e);
+        // A couple of diagrams to keep it straight in my head
+        // verts         vd       edges   h    i      
+        // verts    va --v-- vb   edges --- e ---
+        // verts         vc       edges   g    f
+
+        // a       b
+        //     v
+        //     c
+
+        HalfEdge va = _AddEdge(v, a), vb = _AddEdge(v, b), vc = _AddEdge(v, c), vd = _AddEdge(v, d);
+        v._halfEdge = va;
+        vd._nextEdge = va;
+        vb._nextEdge = vd;
+        vc._nextEdge = vb;
+        va._nextEdge = vc;
+        va.Twin._nextEdge = h;
+        vb.Twin._nextEdge = f;
+        vc.Twin._nextEdge = g;
+        vd.Twin._nextEdge = i;
+        f.Twin._nextEdge = vc.Twin;
+        g.Twin._nextEdge = va.Twin;
+        h.Twin._nextEdge = vd.Twin;
+        i.Twin._nextEdge = vb.Twin;
+        t1._children[0] = new Triangle(g);
+        t1._children[1] = new Triangle(f);
+        t2._children[0] = new Triangle(h);
+        t2._children[1] = new Triangle(i);
+        /*
+        tri._children[0] = new Triangle(e);
+        tri._children[1] = new Triangle(f);
+        tri._children[2] = new Triangle(g);
+        */
+
+        /*
+        SPLIT
+        HalfEdge e = tri.Boundary[0];
+        HalfEdge f = e.Twin.Next;
+        HalfEdge g = f.Twin.Next;
+        Vertex a = e.Tail, b = f.Tail, c = g.Tail;
+        HalfEdge va = _AddEdge(v, a), vb = _AddEdge(v, b), vc = _AddEdge(v, c);
+        v._halfEdge = va;
+        vc._nextEdge = vb;
+        vb._nextEdge = va;
+        va._nextEdge = vc;
+        va.Twin._nextEdge = e;
+        vb.Twin._nextEdge = f;
+        vc.Twin._nextEdge = g;
+        e.Twin._nextEdge = vb.Twin;
+        f.Twin._nextEdge = vc.Twin;
+        g.Twin._nextEdge = va.Twin;
+        tri._children[0] = new Triangle(e);
+        tri._children[1] = new Triangle(f);
+        tri._children[2] = new Triangle(g);
+        */
+
+        /*
+
+        FLIP
+
+        Triangle tri1 = e.Face as Triangle, tri2 = e.Twin.Face as Triangle;
+        HalfEdge f = e.Twin.Next, g = f.Twin.Next, h = e.Next;
+        Vertex va = e.Tail, vb = f.Tail, vc = g.Tail, vd = h.Head;
+        _arr.RemoveEdge(e);
+        HalfEdge i = _AddEdge(vc, vd) ;
+        i._nextEdge = g;
+        f.Twin._nextEdge = i;
+        i.Twin._nextEdge = h.Twin.Next;
+        h.Twin._nextEdge = i.Twin;
+        tri1._children[0] = tri2._children[0] = new Triangle(i);
+        tri1._children[1] = tri2._children[1] = new Triangle(i.Twin);
+        tri2._flag = false;
+        */
+        return va;
+    }
+
+    private void LegalizeAll() 
+    {
+        int safety = 0;
+        int flippedEdges = 0;
+
+        while (true)
+        {
+            safety += 1;
+            if (safety > 10000000)
+            {
+                Debug.Log("Stuck in loop");
+                break;
+            }
+
+            bool hasFlippedEdge = false;
+
+            for (int i = 0; i < _arr.Edges.Count; i++)
+            {
+                var e = _arr.Edges[i];
+
+                if (e.Twin == null) // Skip boundary edges
+                    continue;
+
+                if (!_Legal(e))
+                {
+                    flippedEdges += 1;
+                    hasFlippedEdge = true;
+                    _Flip(e);
+                }
+            }
+
+            if (!hasFlippedEdge)
+            {
+                Debug.Log("Found triangulation");
+                break;
+            }
+        }
+    }
+
+    public void Finish(bool keepAlive)
+    {
+        // TODO: For some reason, a split triangle will show up in the search tree twice, causing it to be drawn when it shouldn't be.
         void RemoveGraph(Triangle f)
         {
             if (f is null)
@@ -306,11 +509,14 @@ public class Delaunay
         }
 
         RemoveGraph(_graph);
-        RemoveVertex(super1);
-        RemoveVertex(super2);
+        if (!keepAlive)
+        {
+            RemoveVertex(super1);
+            RemoveVertex(super2);
+        }
     }
 
-    public static Graph Generate(List<Vector2> points)
+    public static Delaunay Generate(List<Vector2> points, bool keepAlive = true)
     {
         //Debug.Log("--Starting--");
         // Find the initial point
@@ -330,8 +536,11 @@ public class Delaunay
                 del.Insert(pt);
         }
 
-        del._Finish();
-        return del._arr;
+        del.LegalizeAll();
+
+        del.Finish(keepAlive);
+
+        return del;
     }
 
 

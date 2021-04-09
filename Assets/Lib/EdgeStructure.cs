@@ -6,6 +6,7 @@ using UnityEngine;
 
 public class Vertex
 {
+    internal bool isDummy;
     internal Vector2 _v;
     internal HalfEdge _halfEdge;
 
@@ -63,11 +64,12 @@ public class Vertex
                 var f = _halfEdge;
                 while (f.Next != e)
                     f = f.Next;
+                
                 f._nextEdge = e.Next;
                 if (ReferenceEquals(_halfEdge, e))
                     _halfEdge = f;
 
-                /*
+/*
                 // Find the edge right before the one being removed in the list
                 var last = _halfEdge.Edges.Where(x => ReferenceEquals(x.Next, e)).First();
                 // Reassign to skip the removed edge
@@ -82,18 +84,18 @@ public class Vertex
             catch (System.Exception ep)
             {                    
                 Debug.Log("Didn't find edge!");
-                throw ep;
+                //throw ep;
             }
-                */
+            */
         }
         else 
         {
             Debug.Log("No edges to remove!");
-            throw new System.ArgumentException();
+            //throw new System.ArgumentException();
         }
     }
 
-    public override string ToString() => $"({_v.x:F6} {_v.y:F6})";
+    public override string ToString() => isDummy ? "dummy" : $"({_v.x:F6} {_v.y:F6})";
     
 }
 
