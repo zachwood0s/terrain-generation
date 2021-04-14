@@ -21,7 +21,7 @@ public class Delaunay
         internal Triangle[] _children;
         private Vertex _v;
 
-        internal bool _flag;
+        internal bool _generateChildren;
 
         public IReadOnlyList<Triangle> Children => _children;
         public Vertex A => _a;
@@ -39,7 +39,7 @@ public class Delaunay
             _c = e.Twin.Next.Head;
             _children = new Triangle[3];
             _children[0] = _children[1] = _children[2] = null;
-            _flag = true;
+            _generateChildren = true;
         }
 
         public Triangle Flipped() => new Triangle(Boundary[0]) {
@@ -116,11 +116,22 @@ public class Delaunay
         return Predicates.LeftTurn(p, t.V, h.V) == 1;
     }
 
-    public bool Contains(Vector2 p, Triangle tri)
+    public bool Contains(Vector2 p, Triangle tri) =>
+        _LeftOf(p, tri.A, tri.B) && 
+        _LeftOf(p, tri.B, tri.C) &&
+        _LeftOf(p, tri.C, tri.A);
+
+    public bool OnTri(Vector2 p, Triangle tri) =>
+        OnEdge(p, tri.A, tri.B) ||
+        OnEdge(p, tri.B, tri.C) ||
+        OnEdge(p, tri.C, tri.A) || 
+        p == tri.A.V || p == tri.B.V || p == tri.C.V;
+
+    public bool OnEdge(Vector2 p, Vertex a, Vertex b)
     {
-        return _LeftOf(p, tri.A, tri.B) && 
-               _LeftOf(p, tri.B, tri.C) &&
-               _LeftOf(p, tri.C, tri.A);
+        if(IsDummy(a) || IsDummy(b)) return false;
+
+        return Predicates.LeftTurn(p, a.V, b.V) == 0;
     }
 
     public Triangle Find(Vector2 p)
@@ -181,7 +192,7 @@ public class Delaunay
         h.Twin._nextEdge = i.Twin;
         tri1._children[0] = tri2._children[0] = new Triangle(i);
         tri1._children[1] = tri2._children[1] = new Triangle(i.Twin);
-        tri2._flag = false;
+        tri2._generateChildren = false;
     }
 
     private void _LegalizeEdge(Vertex v, HalfEdge edge)
@@ -240,19 +251,36 @@ public class Delaunay
 
     public void Insert(Vector2 p)
     {
-        Vertex v = _arr.AddVertex(p);
+        if (_arr.Contains(p))
+        {
+            Debug.Log("Identical point, not adding");
+            return;
+        }
         //Debug.Log($"searching... {p.x} {p.y}");
         Triangle face = Find(p);
+
+        if (face == null || OnTri(p, face))
+        {
+            Debug.Log("point on edge, not adding");
+            return;
+        }
+
+        if (!Contains(p, face))
+        {
+            Debug.Log($"Point not in found triangle {p}, {face}, not adding");
+            return;
+        }
+
+        Vertex v = _arr.AddVertex(p);
+
         //Debug.Log($"found: {face}");
         HalfEdge e = face.Boundary[0];
         HalfEdge f = e.Twin.Next;
         HalfEdge g = f.Twin.Next;
         _Split(v, face);
-        /*
         _LegalizeEdge(v, e);
         _LegalizeEdge(v, f);
         _LegalizeEdge(v, g);
-        */
     }
 
     /// <summary>
@@ -267,13 +295,17 @@ public class Delaunay
         Vertex v = _arr.AddVertex(p);
 
         Triangle tri1 = e.Face as Triangle, tri2 = e.Twin.Face as Triangle;
+
+        // Create fake faces if necessary
         if (tri1 is null)
         {
             tri1 = new Triangle(e);
+            tri1._generateChildren = false;
         }
         if (tri2 is null)
         {
             tri2 = new Triangle(e.Twin);
+            tri2._generateChildren = false;
         }
 
         if (tri1 != null && tri2 != null)
@@ -416,7 +448,7 @@ public class Delaunay
         while (true)
         {
             safety += 1;
-            if (safety > 10000000)
+            if (safety > 100000)
             {
                 Debug.Log("Stuck in loop");
                 break;
@@ -457,7 +489,7 @@ public class Delaunay
 
             if (f.Children[0] != null) 
             {
-                if (f._flag)
+                if (f._generateChildren)
                 {
                     foreach(var c in f.Children)
                         RemoveGraph(c);
@@ -507,7 +539,7 @@ public class Delaunay
                 _arr.RemoveEdge(f);
             }
         }
-
+        _arr._faces.Clear();
         RemoveGraph(_graph);
         if (!keepAlive)
         {
@@ -532,11 +564,15 @@ public class Delaunay
         // Insert each point into the graph
         foreach (var (i, pt) in points.WithIndex())
         {
+            if (i == 1489)
+            {
+                var l = del._arr._vertexSet.ToList();
+                l.Sort((x, y) => x.x.CompareTo(y.x));
+                Debug.Log("t");
+            }
             if (i != imax)
                 del.Insert(pt);
         }
-
-        del.LegalizeAll();
 
         del.Finish(keepAlive);
 

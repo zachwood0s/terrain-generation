@@ -174,6 +174,7 @@ public class Graph
     internal List<Vertex> _vertices;
     internal List<HalfEdge> _edges;
     internal List<Face> _faces;
+    internal HashSet<Vector2> _vertexSet;
 
     public IReadOnlyList<Vertex> Vertices => _vertices;
     public IReadOnlyList<HalfEdge> Edges => _edges;
@@ -181,12 +182,18 @@ public class Graph
 
     public Graph()
     {
+        _vertexSet = new HashSet<Vector2>();
         _vertices = new List<Vertex>();
         _edges = new List<HalfEdge>();
         _faces = new List<Face>();
     }
+
+    public bool Contains(Vector2 p)
+        => _vertexSet.Contains(p);
+
     public Vertex AddVertex(Vector2 p) 
     {
+        _vertexSet.Add(p);
         var v = new Vertex(p);
         _vertices.Add(v);
         return v;

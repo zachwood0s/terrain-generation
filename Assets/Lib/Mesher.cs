@@ -6,7 +6,7 @@ using UnityEngine;
 public class Quality 
 {
     public float minAngle = 0.0f;
-    public float maxAngle = 180.0f;
+    public float maxAngle = 0.0f;
 
     public int maxSteiner = -1; // -1 if no cap
 

@@ -135,7 +135,7 @@ public static class GeometryHelpers
     public static bool TriangleEncroaching(Vector2 a, Vector2 b, Vector2 c, float goodAngle)
     {
         var dot = (a.x - c.x) * (b.x - c.x) + 
-                  (a.y - c.y) * (b.y - b.y);
+                  (a.y - c.y) * (b.y - c.y);
 
         if (dot < 0.0f)
         {
@@ -195,6 +195,12 @@ public static class TriExt
     public static float MinAngle(this Delaunay.Triangle tri)
     {
         Vector2 aSide = tri.A.V - tri.B.V, bSide = tri.B.V - tri.C.V, cSide = tri.C.V - tri.A.V;
+        float a = Vector2.Angle(aSide, bSide * -1),
+              b = Vector2.Angle(bSide, cSide * -1),
+              c = Vector2.Angle(cSide, aSide * -1);
+        
+        return Mathf.Min(a, b, c);
+        /*
         float aLen = aSide.sqrMagnitude, bLen = bSide.sqrMagnitude, cLen = cSide.sqrMagnitude;
         float minAngle;
 
@@ -203,24 +209,33 @@ public static class TriExt
             // The edge opposite the c is the shortest
             minAngle = Vector2.Dot(bSide, cSide);
             minAngle = minAngle * minAngle / (bLen * cLen);
+            return Vector2.Angle(bSide, cSide);
         }
         else if (bLen > cLen) 
         {
             // The edge opposite a is the shortest
-            minAngle = Vector2.Dot(aSide, cSide);
-            minAngle = minAngle * minAngle / (aLen * cLen);
+            return Vector2.Angle(aSide, bSide * -1);
         }
         else 
         {
             // The edge opposite b is the shortest
             minAngle = Vector2.Dot(aSide, bSide);
             minAngle = minAngle * minAngle / (aLen * bLen);
+            return Vector2.Angle(bSide, cSide * -1);
         }
         return minAngle;
+        */
     }
 
     public static float MaxAngle(this Delaunay.Triangle tri)
     {
+        Vector2 aSide = tri.A.V - tri.B.V, bSide = tri.B.V - tri.C.V, cSide = tri.C.V - tri.A.V;
+        float a = Vector2.Angle(aSide, bSide * -1),
+              b = Vector2.Angle(bSide, cSide * -1),
+              c = Vector2.Angle(cSide, aSide * -1);
+        
+        return Mathf.Max(a, b, c);
+        /*
         Vector2 aSide = tri.A.V - tri.B.V, bSide = tri.B.V - tri.C.V, cSide = tri.C.V - tri.A.V;
         float aLen = aSide.sqrMagnitude, bLen = bSide.sqrMagnitude, cLen = cSide.sqrMagnitude;
         float maxAngle;
@@ -242,6 +257,7 @@ public static class TriExt
             maxAngle = (aLen + bLen - cLen) / (2 * Mathf.Sqrt(aLen + bLen));
         }
         return maxAngle;
+        */
     }
 }
 

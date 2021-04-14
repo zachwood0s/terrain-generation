@@ -27,7 +27,7 @@ public class QualityCheck
     {
         float maxAngle = tri.MaxAngle(), minAngle = tri.MinAngle();
 
-        if((minAngle > _quality.goodAngle) || (maxAngle < _quality.maxGoodAngle && _quality.maxAngle != 0.0f))
+        if((minAngle < _quality.minAngle) || (maxAngle > _quality.maxGoodAngle && _quality.maxAngle != 0.0f))
         {
             // TODO: for now naively add the triangle. Might need to add checks from Miller, Pav, and Walkington
             _badTriQueue.Enqueue(tri);
@@ -40,22 +40,22 @@ public class QualityCheck
         int encroached = 0;
         var tri = e.Face as Delaunay.Triangle;
 
-        if (tri == null) // Boundary triangle
-            return 0;
+        //if (tri == null) // Boundary triangle
+        //    return 0;
 
-        if (GeometryHelpers.TriangleEncroaching(tri.A.V, tri.B.V, tri.C.V, _quality.goodAngle))
+        if (tri != null && GeometryHelpers.TriangleEncroaching(tri.A.V, tri.B.V, tri.C.V, _quality.goodAngle))
         {
             encroached = 1;
         }
 
-        Debug.Log($"{encroached}");
+        //Debug.Log($"{encroached}");
 
         tri = e.Twin.Face as Delaunay.Triangle;
 
-        if (tri == null) // Boundary triangle
-            return 0;
+        //if (tri == null) // Boundary triangle
+        //    return 0;
 
-        if (GeometryHelpers.TriangleEncroaching(tri.A.V, tri.B.V, tri.C.V, _quality.goodAngle))
+        if (tri != null && GeometryHelpers.TriangleEncroaching(tri.A.V, tri.B.V, tri.C.V, _quality.goodAngle))
         {
             encroached += 2;
         }
@@ -98,13 +98,13 @@ public class QualityCheck
             var seg = _badSegs.Dequeue();
             var encTri = seg.Face as Delaunay.Triangle; 
             var testTri = encTri.Boundary[0].Next.Face as Delaunay.Triangle;
-            var testSeg = testTri.Boundary[0];
-            var acuteorg = _del.IsDummy(testSeg);
+            var testSeg = testTri?.Boundary[0];
+            var acuteorg = testSeg is null || _del.IsDummy(testSeg);
             
             // Is the destination shared?
-            testTri = testTri.Boundary[0].Next.Face as Delaunay.Triangle;
-            testSeg = testTri.Boundary[0];
-            var acutedest = _del.IsDummy(testSeg);
+            testTri = testTri?.Boundary[0].Next.Face as Delaunay.Triangle;
+            testSeg = testTri?.Boundary[0];
+            var acutedest = testSeg is null || _del.IsDummy(testSeg);
 
             if(seg.Twin != null && !_del.IsDummy(seg.Twin))
             {
@@ -139,7 +139,7 @@ public class QualityCheck
             Vector2 newPoint = new Vector2(seg.Tail.V.x + split * (seg.Head.V.x - seg.Tail.V.x),
                                            seg.Tail.V.y + split * (seg.Head.V.y - seg.Tail.V.y));
 
-            _del.Insert(newPoint);
+            _del.Insert(newPoint, seg);
 
             if (_steinerLeft > 0)
             {
@@ -152,6 +152,8 @@ public class QualityCheck
     {
         double xi = 0, eta = 0;
         Vector2 newLoc = GeometryHelpers.FindCircumcenter(tri.A.V, tri.B.V, tri.C.V, ref xi, ref eta, 0.0);
+        if ((tri.A.V - newLoc).magnitude > 1000)
+            return;
         bool errorOccured = false;
 
         Debug.Log($"Steiner location {tri} {newLoc}");
@@ -185,6 +187,7 @@ public class QualityCheck
     {
         _TallyEncroaching();
         Debug.Log($"Fixing {_badSegs.Count} edge(s)");
+        //_SplitEncroaching();
 
         if(_quality.minAngle > 0.0)
         {

@@ -70,11 +70,14 @@ public class MeshGenerator : MonoBehaviour
         Assert.AreEqual(heightmap.width, densitymap.width);
         Assert.AreEqual(heightmap.height, densitymap.height);
 
+        /*
         var d = Delaunay.Generate(new List<Vector2>{new Vector2(0.0f, 0.0f), new Vector2(10.0f, 0.0f), new Vector2(5.0f, 5.0f)});
         d.Insert(new Vector2(5.0f, 0.0f), d.Graph.Edges[8]);
+        d.Insert(new Vector2(2.0f, 2.0f), d.Graph.Edges[10]);
 
         d.Finish(false);
         var r = d.Graph;
+        */
 
 
         _vertices = new Vector3[resolution];
@@ -82,7 +85,7 @@ public class MeshGenerator : MonoBehaviour
 
         WritePointsToFile(verts2d.ToArray());
 
-        //var r = Mesher.Triangulate(verts2d, quality);
+        var r = Mesher.Triangulate(verts2d, quality);
         _vertices = new Vector3[r.Triangles.Count * 3];
         _triangles = new int[r.Triangles.Count * 3];
 
