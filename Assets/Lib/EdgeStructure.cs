@@ -34,17 +34,24 @@ public class Vertex
         else if(edge.Clockwise(_halfEdge))
         {
             edge._nextEdge = _halfEdge;
+            var f = _halfEdge.Edges.Last();
+            /*
             var f = _halfEdge;
             while (f.Next != _halfEdge)
                 f = f.Next;
+                */
             f._nextEdge = edge;
             _halfEdge = edge;
         }
         else 
         {                
+            // Find the first non-clockwise edge
+            var f = _halfEdge.Edges.Where(x => !x.Next.Clockwise(edge)).First();
+            /*
             var f = _halfEdge;
             while (f.Next != _halfEdge && f.Next.Clockwise(edge))
                 f = f.Next;
+                */
             edge._nextEdge = f._nextEdge;
             f._nextEdge = edge;
         }
@@ -61,9 +68,13 @@ public class Vertex
             /*
             try {
                 */
+                // Find the edge right before e
+                var f = _halfEdge.Edges.Where(x => x.Next == e).First();
+                /*
                 var f = _halfEdge;
                 while (f.Next != e)
                     f = f.Next;
+                    */
                 
                 f._nextEdge = e.Next;
                 if (ReferenceEquals(_halfEdge, e))
@@ -96,6 +107,8 @@ public class Vertex
     }
 
     public override string ToString() => isDummy ? "dummy" : $"({_v.x:F6} {_v.y:F6})";
+
+    public bool Dummy => isDummy;
     
 }
 
@@ -117,6 +130,9 @@ public class HalfEdge
 
     public HalfEdge Next => _nextEdge;
 
+    public bool Dummy => Tail.Dummy || Head.Dummy;
+
+    public bool isDead;
 
     public HalfEdge(Vertex _v) 
     {
@@ -125,10 +141,14 @@ public class HalfEdge
 
     public IEnumerable<HalfEdge> Edges {
         get {
+            int safety = 0;
             HalfEdge f = this;
             while (f._nextEdge != this) {
                 yield return f;
                 f = f._nextEdge;
+                safety++;
+                if (safety > 100000)
+                    throw new System.ArgumentOutOfRangeException("Malformed edge list");
             }
             yield return f;
         }
@@ -178,7 +198,10 @@ public class Graph
 
     public IReadOnlyList<Vertex> Vertices => _vertices;
     public IReadOnlyList<HalfEdge> Edges => _edges;
-    public IReadOnlyList<Face> Triangles => _faces;
+    public IReadOnlyList<Face> Triangles => _faces.Cast<Delaunay.Triangle>().Where(t => !t.Dummy && !t.Edges().Any(e => e.isDead)).ToList();
+
+    public IEnumerable<HalfEdge> BoundaryEdges => 
+        _edges.Where(e => !e.Dummy && (e.Face as Delaunay.Triangle).Dummy);
 
     public Graph()
     {
@@ -239,5 +262,8 @@ public class Graph
         }
         e.Tail.RemoveEdge(e);
         e.Twin.Tail.RemoveEdge(e.Twin);
+        e.isDead = true;
+        e.Twin.isDead = true;
+
     }
 }

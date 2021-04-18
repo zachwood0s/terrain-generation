@@ -83,7 +83,6 @@ public class MeshGenerator : MonoBehaviour
         _vertices = new Vector3[resolution];
         var verts2d = PointGeneration.PlacePoints(resolution, 100000, densitymap).ToList();
 
-        WritePointsToFile(verts2d.ToArray());
 
         var r = Mesher.Triangulate(verts2d, quality);
         _vertices = new Vector3[r.Triangles.Count * 3];
@@ -114,6 +113,9 @@ public class MeshGenerator : MonoBehaviour
 
         _maxHeight = _vertices.Max(x => x.y);
         _minHeight = _vertices.Min(x => x.y);
+
+        var verts = _vertices.Select(x => new Vector2(x.x, x.z)).Distinct().ToArray();
+        WritePointsToFile(verts);
 
         _colors = new Color[_vertices.Length];
     }

@@ -27,6 +27,7 @@ public class Delaunay
         public Vertex A => _a;
         public Vertex B => _b;
         public Vertex C => _c;
+        public bool Dummy => Edges().Any(e => e.Dummy);
         public Triangle(HalfEdge e)
         {
             _boundary.Add(e);
@@ -47,6 +48,23 @@ public class Delaunay
             _b = this.C,
             _c = this.B,
         };
+
+        public IEnumerable<HalfEdge> Edges() => Edges(Boundary[0]);
+        public IEnumerable<HalfEdge> Edges(HalfEdge starting)
+        {
+            var e = starting;
+            yield return e;
+            e = e.Twin.Next;
+            yield return e;
+            e = e.Twin.Next;
+            yield return e;
+            if (!Boundary[0].isDead) 
+            {
+                Assert.IsTrue(ReferenceEquals(e.Head, Boundary[0].Tail), 
+                            "Malformed triangle!");
+            }
+
+        }
 
         public override string ToString() => $"{A}, {B}, {C}";
     }
@@ -158,9 +176,12 @@ public class Delaunay
 
     private void _Split(Vertex v, Triangle tri)
     {
+        var (e, f, g, _) = tri.Edges();
+        /*
         HalfEdge e = tri.Boundary[0];
         HalfEdge f = e.Twin.Next;
         HalfEdge g = f.Twin.Next;
+        */
         Vertex a = e.Tail, b = f.Tail, c = g.Tail;
         HalfEdge va = _AddEdge(v, a), vb = _AddEdge(v, b), vc = _AddEdge(v, c);
         v._halfEdge = va;
@@ -178,11 +199,22 @@ public class Delaunay
         tri._children[2] = new Triangle(g);
     }
 
-    private void _Flip(HalfEdge e)
+    private void _Flip(HalfEdge edge)
     {
         //Debug.Log($"flipping edge: {e}");
-        Triangle tri1 = e.Face as Triangle, tri2 = e.Twin.Face as Triangle;
-        HalfEdge f = e.Twin.Next, g = f.Twin.Next, h = e.Next;
+        Triangle tri1 = edge.Face as Triangle, tri2 = edge.Twin.Face as Triangle;
+        var (e, f, g, _) = tri1.Edges(edge);
+        var (k, h, j, _) = tri2.Edges(edge.Twin);
+        /*
+        HalfEdge f1 = e.Twin.Next, g1 = f.Twin.Next, h1 = e.Next;
+        Debug.Log($"{h} {k} {j}");
+        Assert.AreEqual(e, edge);
+        Assert.AreEqual(f, f1);
+        Assert.AreEqual(g, g1);
+        Debug.Log($"{h1}");
+        Assert.AreEqual(h, h1);
+        */
+
         Vertex va = e.Tail, vb = f.Tail, vc = g.Tail, vd = h.Head;
         _arr.RemoveEdge(e);
         HalfEdge i = _AddEdge(vc, vd) ;
@@ -190,8 +222,13 @@ public class Delaunay
         f.Twin._nextEdge = i;
         i.Twin._nextEdge = h.Twin.Next;
         h.Twin._nextEdge = i.Twin;
-        tri1._children[0] = tri2._children[0] = new Triangle(i);
-        tri1._children[1] = tri2._children[1] = new Triangle(i.Twin);
+        try{
+            tri1._children[0] = tri2._children[0] = new Triangle(i);
+            tri1._children[1] = tri2._children[1] = new Triangle(i.Twin);
+        }
+        catch {
+            Debug.Log("hosdfihl");
+        }
         tri2._generateChildren = false;
     }
 
@@ -248,8 +285,7 @@ public class Delaunay
         return 1;
     }
 
-
-    public void Insert(Vector2 p)
+    public void Insert(Vector2 p, QualityCheck check=null)
     {
         if (_arr.Contains(p))
         {
@@ -258,6 +294,19 @@ public class Delaunay
         }
         //Debug.Log($"searching... {p.x} {p.y}");
         Triangle face = Find(p);
+
+        // Make sure the point lands inside the hull if doing quality checks
+        if (check != null)
+        {
+            if (face.Dummy)
+            {
+                // Point outside the hull. Find offending segment
+                var bad = face.Edges().Where(e => !e.Dummy).First();
+                Debug.Log($"Encroaching! Probably split {bad}");
+                check._badSegs.Enqueue(bad);
+                return;
+            }
+        }
 
         if (face == null || OnTri(p, face))
         {
@@ -274,9 +323,12 @@ public class Delaunay
         Vertex v = _arr.AddVertex(p);
 
         //Debug.Log($"found: {face}");
+        var (e, f, g, _) = face.Edges();
+        /*
         HalfEdge e = face.Boundary[0];
         HalfEdge f = e.Twin.Next;
         HalfEdge g = f.Twin.Next;
+        */
         _Split(v, face);
         _LegalizeEdge(v, e);
         _LegalizeEdge(v, f);
@@ -300,12 +352,10 @@ public class Delaunay
         if (tri1 is null)
         {
             tri1 = new Triangle(e);
-            tri1._generateChildren = false;
         }
         if (tri2 is null)
         {
             tri2 = new Triangle(e.Twin);
-            tri2._generateChildren = false;
         }
 
         if (tri1 != null && tri2 != null)
@@ -340,9 +390,10 @@ public class Delaunay
         */
     }
 
-    private HalfEdge _Split2(Vertex v, HalfEdge e, Triangle tri)
+    private HalfEdge _Split2(Vertex v, HalfEdge edge, Triangle tri)
     {
-        HalfEdge f = e.Twin.Next, g = f.Twin.Next;
+        var (e, f, g, _) = tri.Edges(edge);
+        //HalfEdge f = e.Twin.Next, g = f.Twin.Next;
         Vertex a = e.Tail, b = f.Tail, c = g.Tail;
         _arr.RemoveEdge(e);
         HalfEdge va = _AddEdge(v, a), vb = _AddEdge(v, b), vc = _AddEdge(v, c);
@@ -360,9 +411,15 @@ public class Delaunay
         return va;
     }
 
-    private HalfEdge _Split4(Vertex v, HalfEdge e, Triangle t1, Triangle t2)
+    private HalfEdge _Split4(Vertex v, HalfEdge edge, Triangle t1, Triangle t2)
     {
-        HalfEdge f = e.Twin.Next, g = f.Twin.Next, h = e.Next, i = h.Twin.Next;
+        var (e, f, g, _) = t1.Edges(edge);
+        var (_, h, i, _) = t2.Edges(edge.Twin);
+        HalfEdge f1 = e.Twin.Next, g1 = f.Twin.Next, h1 = e.Next, i1 = h.Twin.Next;
+        Assert.AreEqual(f, f1);
+        Assert.AreEqual(g, g1);
+        Assert.AreEqual(h, h1);
+        Assert.AreEqual(i, i1);
         Vertex a = e.Tail, b = f.Tail, c = g.Tail, d = h.Head;
         _arr.RemoveEdge(e);
         // A couple of diagrams to keep it straight in my head
@@ -392,6 +449,7 @@ public class Delaunay
         t1._children[1] = new Triangle(f);
         t2._children[0] = new Triangle(h);
         t2._children[1] = new Triangle(i);
+        t2._generateChildren = false;
         /*
         tri._children[0] = new Triangle(e);
         tri._children[1] = new Triangle(f);
@@ -496,8 +554,9 @@ public class Delaunay
                 }
                 return;
             }
+            bool notDummy = f.Edges().All(e => !e.Dummy);
+            /*
             bool looping = true;
-            HalfEdge e = f.Boundary[0];
             while(looping)
             {
                 looping = !ReferenceEquals(e.Tail, super1) && 
@@ -508,23 +567,37 @@ public class Delaunay
                 if (ReferenceEquals(e, f.Boundary[0]))
                     break;
             }
-            if (looping) 
+            */
+            if (notDummy) 
             {
                 _arr._faces.Add(f);
                 return;
             }
-            e = f.Boundary[0];
 
+            if(!keepAlive)
+            {
+                foreach(var edge in f.Edges())
+                {
+                    edge._face = null;
+                }
+            }
+            /*
+            e = f.Boundary[0];
+            int count = 0;
             do 
             {
                 e._face = null;
                 e = e.Twin.Next;
+                count++;
+                Debug.Log(count);
             } 
             while(!ReferenceEquals(e, f.Boundary[0]));
+            */
         }
 
         void RemoveVertex(Vertex v) 
         {
+            /*
             List<HalfEdge> edges = new List<HalfEdge>();
             var e = v.Edge;
             do 
@@ -533,6 +606,8 @@ public class Delaunay
                 e = e.Next;
             }
             while (e != v.Edge);
+            */
+            var edges = v.Edge.Edges.ToList();
 
             foreach(var f in edges)
             {

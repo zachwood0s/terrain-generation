@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Assertions;
 
@@ -8,7 +9,7 @@ public class QualityCheck
     private Delaunay _del;
     private Quality _quality;
 
-    private Queue<HalfEdge> _badSegs;
+    internal Queue<HalfEdge> _badSegs;
     private Queue<Delaunay.Triangle> _badTriQueue; // TODO: maybe optimize to use a priority queue
     private int _steinerLeft;
     public QualityCheck(Delaunay del, Quality q)
@@ -73,7 +74,7 @@ public class QualityCheck
 
     private void _TallyEncroaching()
     {
-        foreach (var e in _del.Graph.Edges)
+        foreach (var e in _del.Graph.BoundaryEdges)
         {
             _CheckForEncroach(e);
         }
@@ -81,24 +82,26 @@ public class QualityCheck
 
     private void _TallyTriangles()
     {
-        foreach (var t in _del.Graph.Triangles)
+        foreach (var t in _del.Graph.Triangles.Cast<Delaunay.Triangle>())
         {
-            _TestTriangle(t as Delaunay.Triangle);
+            _TestTriangle(t);
         }
     }
 
     private void _SplitEncroaching()
     {
+        Debug.Log($"Fixing {_badSegs.Count} edge(s)");
         while (_badSegs.Count > 0)
         {
             if (_steinerLeft == 0)
                 break;
 
-            // Is the origin shared?
             var seg = _badSegs.Dequeue();
+            float split = 0.5f;
+            /*
             var encTri = seg.Face as Delaunay.Triangle; 
-            var testTri = encTri.Boundary[0].Next.Face as Delaunay.Triangle;
-            var testSeg = testTri?.Boundary[0];
+            var testSeg = seg.Next;
+            var testTri = testSeg.Face as Delaunay.Triangle;
             var acuteorg = testSeg is null || _del.IsDummy(testSeg);
             
             // Is the destination shared?
@@ -134,6 +137,7 @@ public class QualityCheck
                     split = 1.0f - split;
                 }
             }
+            */
 
             //Insert vertex;
             Vector2 newPoint = new Vector2(seg.Tail.V.x + split * (seg.Head.V.x - seg.Tail.V.x),
@@ -145,6 +149,7 @@ public class QualityCheck
             {
                 _steinerLeft--;
             }
+            Debug.Log($"Split edge {seg} at {newPoint}");
         }
     }
 
@@ -166,7 +171,7 @@ public class QualityCheck
         else
         {
             // Todo, might need to check eta against xi
-            _del.Insert(newLoc);
+            _del.Insert(newLoc, this);
 
             if (_steinerLeft > 0)
             {
@@ -186,8 +191,9 @@ public class QualityCheck
     private void _Enforce()
     {
         _TallyEncroaching();
-        Debug.Log($"Fixing {_badSegs.Count} edge(s)");
         //_SplitEncroaching();
+
+        _del.Finish(true);
 
         if(_quality.minAngle > 0.0)
         {
@@ -197,14 +203,15 @@ public class QualityCheck
             while (_badTriQueue.Count > 0 && _steinerLeft != 0)
             {
                 var badTri = _badTriQueue.Dequeue();
-                _SplitTriangle(badTri);
+                //_SplitTriangle(badTri);
+                _del.Finish(true);
 
                 if (_badSegs.Count > 0)
                 {
                     // Will need to try again later
                     //_badTriQueue.Enqueue(badTri); 
 
-                    //_SplitEncroaching();
+                    _SplitEncroaching();
                 }
             }
         }
