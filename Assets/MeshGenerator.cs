@@ -117,6 +117,8 @@ public class MeshGenerator : MonoBehaviour
         var verts = _vertices.Select(x => new Vector2(x.x, x.z)).Distinct().ToArray();
         WritePointsToFile(verts);
 
+        Debug.Log($"Created {r.Triangles.Count} triangles and {r.Vertices.Count} vertices");
+
         _colors = new Color[_vertices.Length];
     }
 

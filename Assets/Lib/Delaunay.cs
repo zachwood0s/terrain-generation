@@ -115,23 +115,23 @@ public class Delaunay
         if (ReferenceEquals(t, super2)) 
         {
             //Debug.Log("Took 1");
-            return ReferenceEquals(h, super1) || Predicates.YOrder(h.V, p) >= 0;
+            return ReferenceEquals(h, super1) || Predicates.YOrder(h.V, p) > 0;
         }
         if (ReferenceEquals(t, super1))
         {
             //Debug.Log("Took 2");
             // TODO: Potential colinear point problem
-            return !ReferenceEquals(h, super2) && Predicates.YOrder(p, h.V) >= 0;
+            return !ReferenceEquals(h, super2) && Predicates.YOrder(p, h.V) > 0;
         }
         if (ReferenceEquals(h, super2))
         {
             //Debug.Log("Took 3");
-            return Predicates.YOrder(p, t.V) >= 0;
+            return Predicates.YOrder(p, t.V) > 0;
         }
         if (ReferenceEquals(h, super1))
         {
             //Debug.Log("Took 4");
-            return Predicates.YOrder(t.V, p) >= 0;
+            return Predicates.YOrder(t.V, p) > 0;
         }
         //Debug.Log("Took 5");
         return Predicates.LeftTurn(p, t.V, h.V) == 1;
@@ -252,6 +252,9 @@ public class Delaunay
             _LegalizeEdge(v, f);
             _LegalizeEdge(v, g);
         }
+        else {
+            Debug.Log($"Faces {edge.Face} and {edge.Twin.Face}");
+        }
     }
 
 
@@ -270,6 +273,7 @@ public class Delaunay
         int min_kl = Math.Min(k, l);
 
         //Debug.Log($"{a}\n{b}\n{c}\n{d}\ni: {i} j: {j} k: {k} l: {l}");
+
 
         if ((min_ij < 0 || min_kl < 0)
                 ? min_kl < min_ij 

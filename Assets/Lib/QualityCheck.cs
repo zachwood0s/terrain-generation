@@ -144,8 +144,8 @@ public class QualityCheck
                                            seg.Tail.V.y + split * (seg.Head.V.y - seg.Tail.V.y));
 
             var newe = _del.Insert(newPoint, seg);
-            _CheckForEncroach(newe);
-            _CheckForEncroach(newe.Next.Next);
+            //_CheckForEncroach(newe);
+            //_CheckForEncroach(newe.Next.Next);
 
             if (_steinerLeft > 0)
             {
