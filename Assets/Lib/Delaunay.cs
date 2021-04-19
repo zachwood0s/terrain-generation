@@ -41,6 +41,9 @@ public class Delaunay
             _children = new Triangle[3];
             _children[0] = _children[1] = _children[2] = null;
             _generateChildren = true;
+
+            if(this.ToString() == "(118.250000 474.500000), (215.000000 197.000000), (150.500000 382.000000)")
+                Debug.Log("Bad");
         }
 
         public Triangle Flipped() => new Triangle(Boundary[0]) {
@@ -199,7 +202,7 @@ public class Delaunay
         tri._children[2] = new Triangle(g);
     }
 
-    private void _Flip(HalfEdge edge)
+    private bool _Flip(HalfEdge edge)
     {
         //Debug.Log($"flipping edge: {e}");
         Triangle tri1 = edge.Face as Triangle, tri2 = edge.Twin.Face as Triangle;
@@ -216,20 +219,22 @@ public class Delaunay
         */
 
         Vertex va = e.Tail, vb = f.Tail, vc = g.Tail, vd = h.Head;
+        if(Predicates.LeftTurn(vc.V, vd.V, va.V) == 0 || Predicates.LeftTurn(vc.V, vd.V, vb.V) == 0)
+        {
+            Debug.Log("flipping collinear!");
+            return false;
+        }
+
         _arr.RemoveEdge(e);
         HalfEdge i = _AddEdge(vc, vd) ;
         i._nextEdge = g;
         f.Twin._nextEdge = i;
         i.Twin._nextEdge = h.Twin.Next;
         h.Twin._nextEdge = i.Twin;
-        try{
-            tri1._children[0] = tri2._children[0] = new Triangle(i);
-            tri1._children[1] = tri2._children[1] = new Triangle(i.Twin);
-        }
-        catch {
-            Debug.Log("hosdfihl");
-        }
+        tri1._children[0] = tri2._children[0] = new Triangle(i);
+        tri1._children[1] = tri2._children[1] = new Triangle(i.Twin);
         tri2._generateChildren = false;
+        return true;
     }
 
     private void _LegalizeEdge(Vertex v, HalfEdge edge)
@@ -242,9 +247,11 @@ public class Delaunay
 
         ////Debug.Log($"edge illegal: {edge}");
         HalfEdge f = edge.Next, g = f.Twin.Next;
-        _Flip(edge);
-        _LegalizeEdge(v, f);
-        _LegalizeEdge(v, g);
+        if(_Flip(edge))
+        {
+            _LegalizeEdge(v, f);
+            _LegalizeEdge(v, g);
+        }
     }
 
 
@@ -301,9 +308,27 @@ public class Delaunay
             if (face.Dummy)
             {
                 // Point outside the hull. Find offending segment
-                var bad = face.Edges().Where(e => !e.Dummy).First();
+                var bad = face.Edges().Where(e => !e.Dummy).FirstOrDefault();
+                if(bad is null)
+                {
+                    // Find a better edge
+                    float minDist = float.PositiveInfinity;
+                    foreach(var search in _arr.Edges)
+                    {
+                        if(search.Dummy)
+                            continue;
+                        var closest = GeometryHelpers.FindNearestPointOnLineSegment(search.Tail.V, search.Head.V, p);
+                        var dist = (closest - p).sqrMagnitude;
+                        if (dist < minDist)
+                        {
+                            minDist = dist;
+                            bad = search;
+                        }
+                    }
+                }
+
                 Debug.Log($"Encroaching! Probably split {bad}");
-                check._badSegs.Enqueue(bad);
+                check._badSegs.Enqueue(bad.Twin);
                 return;
             }
         }
@@ -358,16 +383,18 @@ public class Delaunay
             tri2 = new Triangle(e.Twin);
         }
 
-        if (tri1 != null && tri2 != null)
-        {
-            // Split into 4 triangles
-            return _Split4(v, e, tri1, tri2);
-        }
-        else {
+        // Split into 4 triangles
+        var (_, f, g, _) = tri1.Edges(e);
+        var (_, h, i, _) = tri2.Edges(e.Twin);
+        var newe = _Split4(v, e, tri1, tri2);
 
-        }
+        _LegalizeEdge(v, f);
+        _LegalizeEdge(v, g);
+        _LegalizeEdge(v, h);
+        _LegalizeEdge(v, i);
 
-        return e;
+
+        return newe;
         /*
         HalfEdge e = tri.Boundary[0];
         HalfEdge f = e.Twin.Next;
@@ -388,27 +415,6 @@ public class Delaunay
         tri._children[1] = new Triangle(f);
         tri._children[2] = new Triangle(g);
         */
-    }
-
-    private HalfEdge _Split2(Vertex v, HalfEdge edge, Triangle tri)
-    {
-        var (e, f, g, _) = tri.Edges(edge);
-        //HalfEdge f = e.Twin.Next, g = f.Twin.Next;
-        Vertex a = e.Tail, b = f.Tail, c = g.Tail;
-        _arr.RemoveEdge(e);
-        HalfEdge va = _AddEdge(v, a), vb = _AddEdge(v, b), vc = _AddEdge(v, c);
-        v._halfEdge = va;
-        vc._nextEdge = vb;
-        vb._nextEdge = va;
-        va._nextEdge = vc;
-        va.Twin._nextEdge = g.Twin;
-        vb.Twin._nextEdge = f;
-        vc.Twin._nextEdge = g;
-        f.Twin._nextEdge = vc.Twin;
-        g.Twin._nextEdge = va.Twin;
-        tri._children[0] = new Triangle(f);
-        tri._children[1] = new Triangle(g);
-        return va;
     }
 
     private HalfEdge _Split4(Vertex v, HalfEdge edge, Triangle t1, Triangle t2)
@@ -433,14 +439,28 @@ public class Delaunay
 
         HalfEdge va = _AddEdge(v, a), vb = _AddEdge(v, b), vc = _AddEdge(v, c), vd = _AddEdge(v, d);
         v._halfEdge = va;
+        // These go to the right?
         vd._nextEdge = va;
         vb._nextEdge = vd;
         vc._nextEdge = vb;
         va._nextEdge = vc;
+        /*
+        vd._nextEdge = vb;
+        vb._nextEdge = vc;
+        vc._nextEdge = va;
+        va._nextEdge = vd;
+        */
         va.Twin._nextEdge = h;
         vb.Twin._nextEdge = f;
         vc.Twin._nextEdge = g;
         vd.Twin._nextEdge = i;
+        /*
+        va.Twin._nextEdge = g.Twin;
+        vb.Twin._nextEdge = f.Twin;
+        vc.Twin._nextEdge = g;
+        vd.Twin._nextEdge = i;
+        */
+
         f.Twin._nextEdge = vc.Twin;
         g.Twin._nextEdge = va.Twin;
         h.Twin._nextEdge = vd.Twin;
@@ -449,7 +469,6 @@ public class Delaunay
         t1._children[1] = new Triangle(f);
         t2._children[0] = new Triangle(h);
         t2._children[1] = new Triangle(i);
-        t2._generateChildren = false;
         /*
         tri._children[0] = new Triangle(e);
         tri._children[1] = new Triangle(f);

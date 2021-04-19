@@ -176,6 +176,21 @@ public static class GeometryHelpers
 
         return determinant;
     }
+    public static float CCW(Vector2 a, Vector2 b) => (a.Cross(b));
+
+    public static Vector2 FindNearestPointOnLineSegment(Vector2 origin, Vector2 end, Vector2 point)
+    {
+        //Get heading
+        Vector2 heading = (end - origin);
+        float magnitudeMax = heading.magnitude;
+        heading.Normalize();
+
+        //Do projection from the point but clamp it
+        Vector2 lhs = point - origin;
+        float dotP = Vector2.Dot(lhs, heading);
+        dotP = Mathf.Clamp(dotP, 0f, magnitudeMax);
+        return origin + heading * dotP;
+    }
 }
 
 public static class FloatExt 
@@ -259,6 +274,7 @@ public static class TriExt
         return maxAngle;
         */
     }
+
 }
 
 public static class Predicates
@@ -269,7 +285,7 @@ public static class Predicates
 
     public static int YOrder(Vector2 a, Vector2 b) => (b.y - a.y).Sign();
 
-    public static int CCW(Vector2 a, Vector2 b) => (a.Cross(b)).Sign();
+    public static int CCW(Vector2 a, Vector2 b) => GeometryHelpers.CCW(a, b).Sign();
 
     public static int PointInCircumcircle(Vector2 av, Vector2 bv, Vector2 cv, Vector2 p) =>
         GeometryHelpers.CirclePointLocation(av, bv, cv, p).Sign();

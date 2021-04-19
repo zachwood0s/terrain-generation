@@ -143,7 +143,9 @@ public class QualityCheck
             Vector2 newPoint = new Vector2(seg.Tail.V.x + split * (seg.Head.V.x - seg.Tail.V.x),
                                            seg.Tail.V.y + split * (seg.Head.V.y - seg.Tail.V.y));
 
-            _del.Insert(newPoint, seg);
+            var newe = _del.Insert(newPoint, seg);
+            _CheckForEncroach(newe);
+            _CheckForEncroach(newe.Next.Next);
 
             if (_steinerLeft > 0)
             {
@@ -157,8 +159,6 @@ public class QualityCheck
     {
         double xi = 0, eta = 0;
         Vector2 newLoc = GeometryHelpers.FindCircumcenter(tri.A.V, tri.B.V, tri.C.V, ref xi, ref eta, 0.0);
-        if ((tri.A.V - newLoc).magnitude > 1000)
-            return;
         bool errorOccured = false;
 
         Debug.Log($"Steiner location {tri} {newLoc}");
@@ -191,21 +191,21 @@ public class QualityCheck
     private void _Enforce()
     {
         _TallyEncroaching();
-        //_SplitEncroaching();
+        _SplitEncroaching();
 
         _del.Finish(true);
 
         if(_quality.minAngle > 0.0)
         {
             _TallyTriangles();
+
             Debug.Log($"Fixing {_badTriQueue.Count} triangle(s)");
 
             while (_badTriQueue.Count > 0 && _steinerLeft != 0)
             {
                 var badTri = _badTriQueue.Dequeue();
-                //_SplitTriangle(badTri);
+                _SplitTriangle(badTri);
                 _del.Finish(true);
-
                 if (_badSegs.Count > 0)
                 {
                     // Will need to try again later
