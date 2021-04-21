@@ -41,9 +41,6 @@ public class Delaunay
             _children = new Triangle[3];
             _children[0] = _children[1] = _children[2] = null;
             _generateChildren = true;
-
-            if(this.ToString() == "(118.250000 474.500000), (215.000000 197.000000), (150.500000 382.000000)")
-                Debug.Log("Bad");
         }
 
         public Triangle Flipped() => new Triangle(Boundary[0]) {
@@ -221,7 +218,6 @@ public class Delaunay
         Vertex va = e.Tail, vb = f.Tail, vc = g.Tail, vd = h.Head;
         if(Predicates.LeftTurn(vc.V, vd.V, va.V) == 0 || Predicates.LeftTurn(vc.V, vd.V, vb.V) == 0)
         {
-            Debug.Log("flipping collinear!");
             return false;
         }
 
@@ -231,29 +227,43 @@ public class Delaunay
         f.Twin._nextEdge = i;
         i.Twin._nextEdge = h.Twin.Next;
         h.Twin._nextEdge = i.Twin;
+
+        if(i.Face != null) i.Face.dead = true;
+        if(i.Twin.Face != null) i.Twin.Face.dead = true;
+
         tri1._children[0] = tri2._children[0] = new Triangle(i);
         tri1._children[1] = tri2._children[1] = new Triangle(i.Twin);
         tri2._generateChildren = false;
         return true;
     }
 
-    private void _LegalizeEdge(Vertex v, HalfEdge edge)
+    private void _LegalizeEdge(Vertex v, HalfEdge edge, QualityCheck check=null, bool recordFlaws=false)
     {
         //Debug.Log($"legalize edge: {edge}");
         if (!ReferenceEquals(edge.Twin.Next.Head, v))
             edge = edge.Twin;
-        if (_Legal(edge))
+        if (_Legal(edge)){
+            if(recordFlaws && check != null)
+            {
+                /*
+                if(!check.TestTriangle(edge.Face as Delaunay.Triangle))
+                {
+                    Debug.Log("Flipping produced a bad triangle");
+                }
+                */
+            }
             return;
+        }
 
         ////Debug.Log($"edge illegal: {edge}");
         HalfEdge f = edge.Next, g = f.Twin.Next;
         if(_Flip(edge))
         {
-            _LegalizeEdge(v, f);
-            _LegalizeEdge(v, g);
+            _LegalizeEdge(v, f, check, recordFlaws);
+            _LegalizeEdge(v, g, check, recordFlaws);
         }
         else {
-            Debug.Log($"Faces {edge.Face} and {edge.Twin.Face}");
+            //Debug.Log($"Faces {edge.Face} and {edge.Twin.Face}");
         }
     }
 
@@ -296,7 +306,27 @@ public class Delaunay
         return 1;
     }
 
-    public void Insert(Vector2 p, QualityCheck check=null)
+    public void Dissolve(Triangle t)
+    {
+        var lookup = new[]{t.A, t.B, t.C}.ToDictionary(x=>x.V);
+        var (l1, l2, s1) = GeometryHelpers.LongestSide(t.A.V, t.B.V, t.C.V);
+        var dissolveA = lookup[l1];
+        var dissolveB = lookup[l2];
+
+        foreach(var e in dissolveA.Edge.Edges)
+        {
+            if((e.Head == dissolveA && e.Tail == dissolveB) ||
+               (e.Tail == dissolveA && e.Head == dissolveB))
+            {
+                Debug.Log("Dissolved edge");
+                t.dead = true;
+                _arr.RemoveEdge(e);
+                return;
+            }
+        }
+    }
+
+    public void Insert(Vector2 p, QualityCheck check=null, bool recordTriangleFlaws=false)
     {
         if (_arr.Contains(p))
         {
@@ -331,8 +361,11 @@ public class Delaunay
                     }
                 }
 
-                Debug.Log($"Encroaching! Probably split {bad}");
-                check._badSegs.Enqueue(bad.Twin);
+                //Debug.Log($"Encroaching! Probably split {bad}");
+                if(!check._badSegs.Contains(bad.Twin))
+                {
+                    check._badSegs.Enqueue(bad.Twin);
+                }
                 return;
             }
         }
@@ -359,9 +392,9 @@ public class Delaunay
         HalfEdge g = f.Twin.Next;
         */
         _Split(v, face);
-        _LegalizeEdge(v, e);
-        _LegalizeEdge(v, f);
-        _LegalizeEdge(v, g);
+        _LegalizeEdge(v, e, check, recordTriangleFlaws);
+        _LegalizeEdge(v, f, check, recordTriangleFlaws);
+        _LegalizeEdge(v, g, check, recordTriangleFlaws);
     }
 
     /// <summary>
@@ -369,9 +402,15 @@ public class Delaunay
     /// </summary>
     /// <param name="p"></param>
     /// <param name="edge"></param>
-    public HalfEdge Insert(Vector2 p, HalfEdge e)
+    public HalfEdge Insert(Vector2 p, HalfEdge e, QualityCheck check=null, bool recordTriangleFlaws=false)
     {
         Assert.IsFalse(IsDummy(e));
+
+        if (_arr.Contains(p))
+        {
+            Debug.Log("Identical point, not adding");
+            return null;
+        }
 
         Vertex v = _arr.AddVertex(p);
 
@@ -392,10 +431,10 @@ public class Delaunay
         var (_, h, i, _) = tri2.Edges(e.Twin);
         var newe = _Split4(v, e, tri1, tri2);
 
-        _LegalizeEdge(v, f);
-        _LegalizeEdge(v, g);
-        _LegalizeEdge(v, h);
-        _LegalizeEdge(v, i);
+        _LegalizeEdge(v, f, check, recordTriangleFlaws);
+        _LegalizeEdge(v, g, check, recordTriangleFlaws);
+        _LegalizeEdge(v, h, check, recordTriangleFlaws);
+        _LegalizeEdge(v, i, check, recordTriangleFlaws);
 
 
         return newe;

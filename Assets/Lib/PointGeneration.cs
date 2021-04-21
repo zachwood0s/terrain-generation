@@ -29,7 +29,9 @@ public class PointGeneration
 
             if (decide >= cutoff)
             {
-                yield return new Vector2(randx, randy);
+                float permx = Random.Range(0,distributionMap.width/100);
+                float permy = Random.Range(0,distributionMap.height/100);
+                yield return new Vector2(randx, randy) + new Vector2(permx, permy);
                 i++;
             }
         }

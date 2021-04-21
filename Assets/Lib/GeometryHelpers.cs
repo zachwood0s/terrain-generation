@@ -149,6 +149,42 @@ public static class GeometryHelpers
         return false;
     }
 
+    public static bool TriangleEncroaching(Vector2 a, Vector2 b, Vector2 c)
+    {
+        var (l1, l2, s1) = LongestSide(a, b, c);
+        return PointEncroaching(l1, l2, s1);
+    }
+
+    public static (Vector2, Vector2, Vector2) LongestSide(Vector2 a, Vector2 b, Vector2 c)
+    {
+        float al = (a - b).sqrMagnitude, 
+              bl = (b - c).sqrMagnitude,
+              cl = (c - a).sqrMagnitude;
+
+        if (al > bl && al > cl)
+        {
+            // a->b longest
+            return (a, b, c);
+        }
+        else if(bl > cl)
+        {
+            // b->c longest
+            return (b, c, a);
+        }
+        else 
+        {
+            // c->a longest
+            return (c, a, b);
+        }
+    }
+
+    public static bool PointEncroaching(Vector2 a, Vector2 b, Vector2 p)
+    {
+        var diam = b - a;
+        var mid = a + diam * 0.5f;
+        return (p - mid).sqrMagnitude < diam.sqrMagnitude;
+    }
+
     /// <summary>
     /// Tests if a point is inside, outside or on a circle; 
     /// </summary>
@@ -213,7 +249,7 @@ public static class TriExt
         float a = Vector2.Angle(aSide, bSide * -1),
               b = Vector2.Angle(bSide, cSide * -1),
               c = Vector2.Angle(cSide, aSide * -1);
-        
+
         return Mathf.Min(a, b, c);
         /*
         float aLen = aSide.sqrMagnitude, bLen = bSide.sqrMagnitude, cLen = cSide.sqrMagnitude;

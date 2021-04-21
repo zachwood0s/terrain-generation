@@ -180,6 +180,7 @@ public class HalfEdge
 public class Face 
 {
     protected internal List<HalfEdge> _boundary;
+    public bool dead;
 
     public IReadOnlyList<HalfEdge> Boundary => _boundary;
 
