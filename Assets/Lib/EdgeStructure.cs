@@ -199,7 +199,8 @@ public class Graph
 
     public IReadOnlyList<Vertex> Vertices => _vertices;
     public IReadOnlyList<HalfEdge> Edges => _edges;
-    public IReadOnlyList<Face> Triangles => _faces.Cast<Delaunay.Triangle>().Where(t => !t.Dummy && !t.Edges().Any(e => e.isDead)).ToList();
+    public IEnumerable<Face> Triangles => 
+        _faces.Cast<Delaunay.Triangle>().Where(t => !t.Dummy && !t.dead && t.Children[0] == null);
 
     public IEnumerable<HalfEdge> BoundaryEdges => 
         _edges.Where(e => !e.Dummy && (e.Face as Delaunay.Triangle).Dummy);

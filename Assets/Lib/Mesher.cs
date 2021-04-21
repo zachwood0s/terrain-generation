@@ -17,9 +17,8 @@ public class Mesher
 {
     public static Graph Triangulate(List<Vector2> points, Quality quality)
     {
-        var del = Delaunay.Generate(points);
+        var del = Delaunay.Generate(points, quality);
         QualityCheck.Enforce(del, quality);
-        del.Finish(false);
 
         return del.Graph;
     }

@@ -7,7 +7,7 @@ using UnityEngine.Assertions;
 
 public class Delaunay 
 {
-    private Graph _arr;
+    internal Graph _arr;
 
     internal Vertex super1, super2;
 
@@ -194,9 +194,13 @@ public class Delaunay
         e.Twin._nextEdge = vb.Twin;
         f.Twin._nextEdge = vc.Twin;
         g.Twin._nextEdge = va.Twin;
+        tri.dead = true;
         tri._children[0] = new Triangle(e);
         tri._children[1] = new Triangle(f);
         tri._children[2] = new Triangle(g);
+        _arr._faces.Add(tri.Children[0]);
+        _arr._faces.Add(tri.Children[1]);
+        _arr._faces.Add(tri.Children[2]);
     }
 
     private bool _Flip(HalfEdge edge)
@@ -231,9 +235,13 @@ public class Delaunay
         if(i.Face != null) i.Face.dead = true;
         if(i.Twin.Face != null) i.Twin.Face.dead = true;
 
+        tri1.dead = true;
+        tri2.dead = true;
         tri1._children[0] = tri2._children[0] = new Triangle(i);
         tri1._children[1] = tri2._children[1] = new Triangle(i.Twin);
         tri2._generateChildren = false;
+        _arr._faces.Add(tri1.Children[0]);
+        _arr._faces.Add(tri2.Children[1]);
         return true;
     }
 
@@ -245,6 +253,8 @@ public class Delaunay
         if (_Legal(edge)){
             if(recordFlaws && check != null)
             {
+                check.CheckForBadAndAdd(edge.Face as Delaunay.Triangle);
+                check.CheckForBadAndAdd(edge.Twin.Face as Delaunay.Triangle);
                 /*
                 if(!check.TestTriangle(edge.Face as Delaunay.Triangle))
                 {
@@ -508,10 +518,16 @@ public class Delaunay
         g.Twin._nextEdge = va.Twin;
         h.Twin._nextEdge = vd.Twin;
         i.Twin._nextEdge = vb.Twin;
+        t1.dead = true;
+        t2.dead = true;
         t1._children[0] = new Triangle(g);
         t1._children[1] = new Triangle(f);
         t2._children[0] = new Triangle(h);
         t2._children[1] = new Triangle(i);
+        _arr._faces.Add(t1._children[0]);
+        _arr._faces.Add(t1._children[1]);
+        _arr._faces.Add(t2._children[0]);
+        _arr._faces.Add(t2._children[1]);
         /*
         tri._children[0] = new Triangle(e);
         tri._children[1] = new Triangle(f);
@@ -599,93 +615,7 @@ public class Delaunay
         }
     }
 
-    public void Finish(bool keepAlive)
-    {
-        // TODO: For some reason, a split triangle will show up in the search tree twice, causing it to be drawn when it shouldn't be.
-        void RemoveGraph(Triangle f)
-        {
-            if (f is null)
-                return;
-
-            if (f.Children[0] != null) 
-            {
-                if (f._generateChildren)
-                {
-                    foreach(var c in f.Children)
-                        RemoveGraph(c);
-                }
-                return;
-            }
-            bool notDummy = f.Edges().All(e => !e.Dummy);
-            /*
-            bool looping = true;
-            while(looping)
-            {
-                looping = !ReferenceEquals(e.Tail, super1) && 
-                          !ReferenceEquals(e.Head, super1) && 
-                          !ReferenceEquals(e.Tail, super2) &&
-                          !ReferenceEquals(e.Head, super2);
-                e = e.Twin.Next;
-                if (ReferenceEquals(e, f.Boundary[0]))
-                    break;
-            }
-            */
-            if (notDummy) 
-            {
-                _arr._faces.Add(f);
-                return;
-            }
-
-            if(!keepAlive)
-            {
-                foreach(var edge in f.Edges())
-                {
-                    edge._face = null;
-                }
-            }
-            /*
-            e = f.Boundary[0];
-            int count = 0;
-            do 
-            {
-                e._face = null;
-                e = e.Twin.Next;
-                count++;
-                Debug.Log(count);
-            } 
-            while(!ReferenceEquals(e, f.Boundary[0]));
-            */
-        }
-
-        void RemoveVertex(Vertex v) 
-        {
-            /*
-            List<HalfEdge> edges = new List<HalfEdge>();
-            var e = v.Edge;
-            do 
-            {
-                edges.Add(e);
-                e = e.Next;
-            }
-            while (e != v.Edge);
-            */
-            var edges = v.Edge.Edges.ToList();
-
-            foreach(var f in edges)
-            {
-                _arr.RemoveEdge(f);
-            }
-        }
-        _arr._faces.Clear();
-        RemoveGraph(_graph);
-        if (!keepAlive)
-        {
-            RemoveVertex(super1);
-            RemoveVertex(super2);
-        }
-    }
-
-    public static Delaunay Generate(List<Vector2> points, bool keepAlive = true)
+    public static Delaunay Generate(List<Vector2> points, Quality quality, bool keepAlive = true)
     {
         //Debug.Log("--Starting--");
         // Find the initial point
@@ -709,9 +639,8 @@ public class Delaunay
             }
             if (i != imax)
                 del.Insert(pt);
+            
         }
-
-        del.Finish(keepAlive);
 
         return del;
     }

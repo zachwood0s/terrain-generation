@@ -1,8 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 using UnityEngine;
 using UnityEngine.Assertions;
+using Unity.EditorCoroutines.Editor;
 
 public class QualityCheck
 {
@@ -140,9 +142,12 @@ public class QualityCheck
 
     private bool _FindBadEdge(out HalfEdge edge)
     {
-        foreach (var e in _del.Graph.Edges)
+        if(_badSegs.Count == 0)
         {
-            CheckForEncroachAndAdd(e);
+            foreach (var e in _del.Graph.Edges)
+            {
+                CheckForEncroachAndAdd(e);
+            }
         }
         if(_badSegs.Count > 0)
         {
@@ -155,9 +160,12 @@ public class QualityCheck
 
     private bool _FindBad(out Delaunay.Triangle tri)
     {
-        foreach (var t in _del.Graph.Triangles.Cast<Delaunay.Triangle>())
+        if(_badTriQueue.Count == 0)
         {
-            CheckForBadAndAdd(t);
+            foreach (var t in _del.Graph.Triangles.Cast<Delaunay.Triangle>())
+            {
+                CheckForBadAndAdd(t);
+            }
         }
         if(_badTriQueue.Count > 0)
         {
@@ -335,13 +343,44 @@ public class QualityCheck
             else
                 _SplitTriangle(badTri);
             
-            _del.Finish(true);
         }
         //}
 
         if(!_FindBad(out badTri))
         {
-            Assert.IsFalse(_del.Graph.Triangles.Cast<Delaunay.Triangle>().Any(x => x.MinAngle() < _quality.minAngle));
+            var bad = _del.Graph.Triangles.Cast<Delaunay.Triangle>().Where(x => x.MinAngle() < _quality.minAngle).ToList();
+            foreach(var v in bad)
+                Debug.Log(v);
+            Assert.AreEqual(0,bad.Count);
+        }
+        else if(_steinerLeft == 0)
+        {
+            Debug.Log("Used all availible points");
+        }
+    }
+    public IEnumerator EnforceEnum(Action updater)
+    {
+        Delaunay.Triangle badTri = null;
+        HalfEdge badEdge = null;
+        while((_FindBadEdge(out badEdge) || _FindBad(out badTri)) && _steinerLeft != 0)
+        {
+            if(badEdge != null)
+                _SplitEncroaching(badEdge, false);
+            else
+                _SplitTriangle(badTri);
+
+            updater();
+            
+            yield return null;
+        }
+        //}
+
+        if(!_FindBad(out badTri))
+        {
+            var bad = _del.Graph.Triangles.Cast<Delaunay.Triangle>().Where(x => x.MinAngle() < _quality.minAngle).ToList();
+            foreach(var v in bad)
+                Debug.Log(v);
+            Assert.AreEqual(0,bad.Count);
         }
         else if(_steinerLeft == 0)
         {
@@ -351,7 +390,7 @@ public class QualityCheck
 
     public static void Enforce(Delaunay del, Quality quality)
     {
-        Assert.AreNotEqual(0, del.Graph.Triangles.Count);
+        Assert.AreNotEqual(0, del.Graph.Triangles.Count());
 
         var q = new QualityCheck(del, quality);
         q._Enforce();

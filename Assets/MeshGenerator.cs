@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Assertions;
+using Unity.EditorCoroutines.Editor;
 using EasyButtons;
 
 public class MeshGenerator : MonoBehaviour
@@ -38,6 +39,12 @@ public class MeshGenerator : MonoBehaviour
     [Header("Triangulation Settings")]
     public Quality quality;
 
+    private bool _started = false;
+
+    EditorCoroutine coroutine;
+
+    public bool animate = false;
+
 
     void Start()
     {
@@ -58,9 +65,21 @@ public class MeshGenerator : MonoBehaviour
         GetComponent<MeshFilter>().mesh = _mesh;
 
         Random.InitState(seed);
-        CreateShape();
-        UpdateMesh();
-        Debug.Log("Done!");
+        if(animate)
+        {
+            if(coroutine != null)
+                EditorCoroutineUtility.StopCoroutine(coroutine);
+            Time.timeScale = 1;
+            //CreateShape();
+            //UpdateMesh();
+            coroutine = EditorCoroutineUtility.StartCoroutineOwnerless(InsertPoints());
+            Debug.Log("Done!");
+        }
+        else 
+        {
+            CreateShape();
+            UpdateMesh();
+        }
     }
 
     void CreateShape()
@@ -80,13 +99,17 @@ public class MeshGenerator : MonoBehaviour
         */
 
 
-        _vertices = new Vector3[resolution];
         var verts2d = PointGeneration.PlacePoints(resolution, 100000, densitymap).ToList();
 
-
         var r = Mesher.Triangulate(verts2d, quality);
-        _vertices = new Vector3[r.Triangles.Count * 3];
-        _triangles = new int[r.Triangles.Count * 3];
+        UpdateMeshFromDelaunay(r);
+    }
+
+    private void UpdateMeshFromDelaunay(Graph r)
+    {
+        var triangles = r.Triangles.ToList();
+        _vertices = new Vector3[triangles.Count * 3];
+        _triangles = new int[triangles.Count * 3];
 
         var tris = r.Triangles.Cast<Delaunay.Triangle>();
         int vert = 0;
@@ -117,9 +140,41 @@ public class MeshGenerator : MonoBehaviour
         var verts = _vertices.Select(x => new Vector2(x.x, x.z)).Distinct().ToArray();
         WritePointsToFile(verts);
 
-        Debug.Log($"Created {r.Triangles.Count} triangles and {r.Vertices.Count} vertices");
+        Debug.Log($"Created {triangles.Count} triangles and {r.Vertices.Count} vertices");
 
         _colors = new Color[_vertices.Length];
+    }
+
+    public IEnumerator InsertPoints()
+    {
+        var points = PointGeneration.PlacePoints(resolution, 100000, densitymap).ToList();
+        int imax = 0;
+        foreach (var (i, pt) in points.WithIndex()) 
+        {
+            if (Predicates.YOrder(points[imax], pt) == 1)        
+                imax = i;
+        }
+
+        var del = new Delaunay(points[imax]);
+
+        // Insert each point into the graph
+        foreach (var (i, pt) in points.WithIndex())
+        {
+            if (i != imax)
+                del.Insert(pt);
+            
+            if(i >= 3)
+            {
+                UpdateMeshFromDelaunay(del._arr);
+                UpdateMesh();
+            }
+            yield return null;
+        }
+        Debug.Log("Done with base triangulation");
+        yield return new EditorWaitForSeconds(10f);
+        var q = new QualityCheck(del, quality);
+        yield return q.EnforceEnum(() => {UpdateMeshFromDelaunay(del._arr); UpdateMesh();});
+        _started = false;
     }
 
     private Vector3 ConvertPoint(Vector2 point)
