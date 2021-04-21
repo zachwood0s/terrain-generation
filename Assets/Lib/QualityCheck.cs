@@ -49,7 +49,6 @@ public class QualityCheck
 
     private int _CheckForEncroach(HalfEdge e)
     {
-        /*
         var tri = e.Face as Delaunay.Triangle;
         if(tri != null && !tri.Dummy && GeometryHelpers.TriangleEncroaching(tri.A.V, tri.B.V, tri.C.V))
         {
@@ -61,8 +60,8 @@ public class QualityCheck
             return 2;
         }
         return 0;
-        */
         
+        /*
         // Todo add checks for boundary triangles
         int encroached = 0;
         var tri = e.Face as Delaunay.Triangle;
@@ -98,7 +97,7 @@ public class QualityCheck
         }
         */
 
-        return encroached;
+        //return encroached;
     }
 
     private void _TallyEncroaching()
@@ -117,17 +116,33 @@ public class QualityCheck
         }
     }
 
+    public void CheckForBadAndAdd(Delaunay.Triangle t)
+    {
+        if(!TestTriangle(t))
+        {
+            if(!_badTriQueue.Contains(t))
+            {
+                _badTriQueue.Enqueue(t);
+            }
+        }
+    }
+
+    public void CheckForEncroachAndAdd(HalfEdge e)
+    {
+        if(_CheckForEncroach(e) > 0)
+        {
+            if(!_badSegs.Contains(e))
+            {
+                _badSegs.Enqueue(e);
+            }
+        }
+    }
+
     private bool _FindBadEdge(out HalfEdge edge)
     {
-        foreach (var e in _del.Graph.BoundaryEdges)
+        foreach (var e in _del.Graph.Edges)
         {
-            if(_CheckForEncroach(e) > 0)
-            {
-                if(!_badSegs.Contains(e))
-                {
-                    _badSegs.Enqueue(e);
-                }
-            }
+            CheckForEncroachAndAdd(e);
         }
         if(_badSegs.Count > 0)
         {
@@ -142,13 +157,7 @@ public class QualityCheck
     {
         foreach (var t in _del.Graph.Triangles.Cast<Delaunay.Triangle>())
         {
-            if(!TestTriangle(t))
-            {
-                if(!_badTriQueue.Contains(t))
-                {
-                    _badTriQueue.Enqueue(t);
-                }
-            }
+            CheckForBadAndAdd(t);
         }
         if(_badTriQueue.Count > 0)
         {
@@ -216,8 +225,8 @@ public class QualityCheck
         // Make sure the new subsegments aren't encroaching
         if(newe != null)
         {
-            //_CheckForEncroach(newe);
-            //_CheckForEncroach(newe.Next.Next);
+            //CheckForEncroachAndAdd(newe);
+            //CheckForEncroachAndAdd(newe.Next.Next);
         }
 
         if (_steinerLeft > 0)
@@ -317,17 +326,17 @@ public class QualityCheck
                 }
             }
             */
-            Delaunay.Triangle badTri = null;
-            HalfEdge badEdge = null;
-            while((_FindBadEdge(out badEdge) || _FindBad(out badTri)) && _steinerLeft != 0)
-            {
-                if(badEdge != null)
-                    _SplitEncroaching(badEdge, false);
-                else
-                    _SplitTriangle(badTri);
-                
-                _del.Finish(true);
-            }
+        Delaunay.Triangle badTri = null;
+        HalfEdge badEdge = null;
+        while((_FindBadEdge(out badEdge) || _FindBad(out badTri)) && _steinerLeft != 0)
+        {
+            if(badEdge != null)
+                _SplitEncroaching(badEdge, false);
+            else
+                _SplitTriangle(badTri);
+            
+            _del.Finish(true);
+        }
         //}
 
         if(!_FindBad(out badTri))
